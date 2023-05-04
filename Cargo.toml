@@ -1,0 +1,21 @@
+[package]
+name = "muehle-game"
+version = "0.1.0"
+authors = ["Jannik Becker <jannikb@posteo.de>"]
+edition = "2021"
+
+[dependencies]
+smallvec = "1.10.0"
+smartstring = "1.0.1"
+
+[dev-dependencies]
+criterion = "0.4"
+
+[profile.dev]
+opt-level = 1
+
+[profile.release]
+lto = true # = fat lto, lto = "thin" might be preferable
+codegen-units = 1 # disable codegen unit parallelization to higher the optimization potential
+panic = "abort" # disables catch or unwind panics, reduces binary size & might increase performance slightly
+strip = true
