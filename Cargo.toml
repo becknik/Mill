@@ -5,6 +5,7 @@ authors = ["Jannik Becker <jannikb@posteo.de>"]
 edition = "2021"
 
 [dependencies]
+yansi = "0.5.1"
 smallvec = "1.10.0"
 smartstring = "1.0.1"
 
