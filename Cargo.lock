@@ -281,6 +281,7 @@ name = "muehle-game"
 version = "0.1.0"
 dependencies = [
  "criterion",
+ "once_cell",
  "smallvec",
  "smartstring",
  "yansi",
