@@ -9,15 +9,15 @@ pub mod game {
 
     #[derive(Debug, Clone, Copy)]
     pub enum PlayerColor {
-        White = 0b10,
-        Black = 0b01,
+        White = 0b01,
+        Black = 0b10,
     }
 
     impl Display for PlayerColor {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             match self {
                 PlayerColor::White => f.write_str("●"),
-                PlayerColor::Black => f.write_str("X"),
+                PlayerColor::Black => f.write_str("○"),
             }
         }
     }

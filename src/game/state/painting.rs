@@ -17,7 +17,7 @@ use super::{FieldState, PlayField, PlayFieldError};
 impl Display for FieldState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            FieldState::Free => f.write_str("⚬"),
+            FieldState::Free => f.write_str("·"),
             FieldState::White => PlayerColor::White.fmt(f),
             FieldState::Black => PlayerColor::Black.fmt(f),
         }
@@ -87,23 +87,23 @@ impl PlayField {
         let a = self.unwrap_and_highligth(&mut iter, &indices_to_highlight);
         let b = self.unwrap_and_highligth(&mut iter, &indices_to_highlight);
         let c = self.unwrap_and_highligth(&mut iter, &indices_to_highlight);
-        print!("\t{}|  {}············{}············{}\n", row, c, b, a);
+        print!("\t{}|  {}------------{}------------{}\n", row, c, b, a);
         row -= 1;
-        print!("\t |  ·            ·            ·\n");
+        print!("\t |  |            |            |\n");
 
         let a = self.unwrap_and_highligth(&mut iter, &indices_to_highlight);
         let b = self.unwrap_and_highligth(&mut iter, &indices_to_highlight);
         let c = self.unwrap_and_highligth(&mut iter, &indices_to_highlight);
-        print!("\t{}|  ·   {}········{}········{}   ·\n", row, c, b, a);
+        print!("\t{}|  |   {}--------{}--------{}   |\n", row, c, b, a);
         row -= 1;
-        print!("\t |  ·   ·        ·        ·   ·\n");
+        print!("\t |  |   |        |        |   |\n");
 
         let a = self.unwrap_and_highligth(&mut iter, &indices_to_highlight);
         let b = self.unwrap_and_highligth(&mut iter, &indices_to_highlight);
         let c = self.unwrap_and_highligth(&mut iter, &indices_to_highlight);
-        print!("\t{}|  ·   ·   {}····{}····{}   ·   ·\n", row, c, b, a);
+        print!("\t{}|  |   |   {}----{}----{}   |   |\n", row, c, b, a);
         row -= 1;
-        print!("\t |  ·   ·   ·         ·   ·   ·\n");
+        print!("\t |  |   |   |         |   |   |\n");
 
         let a = self.unwrap_and_highligth(&mut iter, &indices_to_highlight);
         let b = self.unwrap_and_highligth(&mut iter, &indices_to_highlight);
@@ -111,28 +111,28 @@ impl PlayField {
         let d = self.unwrap_and_highligth(&mut iter, &indices_to_highlight);
         let e = self.unwrap_and_highligth(&mut iter, &indices_to_highlight);
         let f = self.unwrap_and_highligth(&mut iter, &indices_to_highlight);
-        print!("\t{}|  {}···{}···{}         {}···{}···{}\n", row, f, e, d, c, b, a);
+        print!("\t{}|  {}---{}---{}         {}---{}---{}\n", row, f, e, d, c, b, a);
         row -= 1;
-        print!("\t |  ·   ·   ·         ·   ·   ·\n");
+        print!("\t |  |   |   |         |   |   |\n");
 
         let a = self.unwrap_and_highligth(&mut iter, &indices_to_highlight);
         let b = self.unwrap_and_highligth(&mut iter, &indices_to_highlight);
         let c = self.unwrap_and_highligth(&mut iter, &indices_to_highlight);
-        print!("\t{}|  ·   ·   {}····{}····{}   ·   ·\n", row, c, b, a);
+        print!("\t{}|  |   |   {}----{}----{}   |   |\n", row, c, b, a);
         row -= 1;
-        print!("\t |  ·   ·        ·        ·   ·\n");
+        print!("\t |  |   |        |        |   |\n");
 
         let a = self.unwrap_and_highligth(&mut iter, &indices_to_highlight);
         let b = self.unwrap_and_highligth(&mut iter, &indices_to_highlight);
         let c = self.unwrap_and_highligth(&mut iter, &indices_to_highlight);
-        print!("\t{}|  ·   {}········{}········{}   ·\n", row, c, b, a);
+        print!("\t{}|  |   {}--------{}--------{}   |\n", row, c, b, a);
         row -= 1;
-        print!("\t |  ·            ·            ·\n");
+        print!("\t |  |            |            |\n");
 
         let a = self.unwrap_and_highligth(&mut iter, &indices_to_highlight);
         let b = self.unwrap_and_highligth(&mut iter, &indices_to_highlight);
         let c = self.unwrap_and_highligth(&mut iter, &indices_to_highlight);
-        print!("\t{}|  {}············{}············{}\n", row, c, b, a);
+        print!("\t{}|  {}------------{}------------{}\n", row, c, b, a);
         print!("\t   ____________________________\n");
         print!("\t    A   B   C    D    E   F   G\n");
 
@@ -148,38 +148,38 @@ impl PlayField {
         let mut row = 7;
 
         let (a, b, c) = (iter.next().unwrap(), iter.next().unwrap(), iter.next().unwrap());
-        print!("\t{}|  {}············{}············{}\n", row, c, b, a);
+        print!("\t{}|  {}------------{}------------{}\n", row, c, b, a);
         row -= 1;
-        print!("\t |  ·            ·            ·\n");
+        print!("\t |  |            |            |\n");
 
         let (a, b, c) = (iter.next().unwrap(), iter.next().unwrap(), iter.next().unwrap());
-        print!("\t{}|  ·   {}········{}········{}   ·\n", row, c, b, a);
+        print!("\t{}|  |   {}--------{}--------{}   |\n", row, c, b, a);
         row -= 1;
-        print!("\t |  ·   ·        ·        ·   ·\n");
+        print!("\t |  |   |        |        |   |\n");
 
         let (a, b, c) = (iter.next().unwrap(), iter.next().unwrap(), iter.next().unwrap());
-        print!("\t{}|  ·   ·   {}····{}····{}   ·   ·\n", row, c, b, a);
+        print!("\t{}|  |   |   {}----{}----{}   |   |\n", row, c, b, a);
         row -= 1;
-        print!("\t |  ·   ·   ·         ·   ·   ·\n");
+        print!("\t |  |   |   |         |   |   |\n");
 
         let (a, b, c) = (iter.next().unwrap(), iter.next().unwrap(), iter.next().unwrap());
         let (d, e, f) = (iter.next().unwrap(), iter.next().unwrap(), iter.next().unwrap());
-        print!("\t{}|  {}···{}···{}         {}···{}···{}\n", row, f, e, d, c, b, a);
+        print!("\t{}|  {}---{}---{}         {}---{}---{}\n", row, f, e, d, c, b, a);
         row -= 1;
-        print!("\t |  ·   ·   ·         ·   ·   ·\n");
+        print!("\t |  |   |   |         |   |   |\n");
 
         let (a, b, c) = (iter.next().unwrap(), iter.next().unwrap(), iter.next().unwrap());
-        print!("\t{}|  ·   ·   {}····{}····{}   ·   ·\n", row, c, b, a);
+        print!("\t{}|  |   |   {}----{}----{}   |   |\n", row, c, b, a);
         row -= 1;
-        print!("\t |  ·   ·        ·        ·   ·\n");
+        print!("\t |  |   |        |        |   |\n");
 
         let (a, b, c) = (iter.next().unwrap(), iter.next().unwrap(), iter.next().unwrap());
-        print!("\t{}|  ·   {}········{}········{}   ·\n", row, c, b, a);
+        print!("\t{}|  |   {}--------{}--------{}   |\n", row, c, b, a);
         row -= 1;
-        print!("\t |  ·            ·            ·\n");
+        print!("\t |  |            |            |\n");
 
         let (a, b, c) = (iter.next().unwrap(), iter.next().unwrap(), iter.next().unwrap());
-        print!("\t{}|  {}············{}············{}\n", row, c, b, a);
+        print!("\t{}|  {}------------{}------------{}\n", row, c, b, a);
         print!("\t   ____________________________\n");
         print!("\t    A   B   C    D    E   F   G\n");
 
