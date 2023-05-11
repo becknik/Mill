@@ -22,14 +22,21 @@ pub enum GamePhase {
 }
 
 impl super::GameCoordinator {
-    /// Returns valid coordinates of the game field in A_G, 1-7 mapping.
-    /// Loops & requests input until the provided input is valid. Handles all error cases.
+    /// Returns valid coordinates of the game field in A_G, 1-7 mapping. The coordinate is requested after printing out the message argument
+    /// Loops & requests input until the provided input is valid. Handles ALL error cases.
+    ///
+    /// Handled extreme cases:
+    /// - Input fails
+    /// - Input is to short or to long
+    /// - first char is not \in 'A'-'G'
+    /// - second char is not \in 1-7
     pub fn get_field_coord_input(&self, message: &str) -> Field {
-        let vaild_input = loop {
+        return loop {
             print!("{}", message);
             io::stdout().flush().unwrap();
 
             let mut input_buffer = String::new();
+
             match io::stdin().read_line(&mut input_buffer) {
                 Ok(_) => {
                     let input_buffer = input_buffer.trim();
@@ -37,12 +44,15 @@ impl super::GameCoordinator {
                     if input_buffer.len() < 2 {
                         print_error("Provided input is to short.");
                         continue;
+                    } else if 3 <= input_buffer.len() {
+                        print_error("Provided input is longer than 2 characters.")
                     }
 
-                    let row = match input_buffer[0..1].parse::<char>() {
-                        Ok(c) if c.is_alphabetic() => c.to_uppercase().next().unwrap(),
+                    // Parsing checks
+                    let row_char = match input_buffer[0..1].parse::<char>() {
+                        Ok(c) if ('A'..='G').contains(&c) => c.to_uppercase().next().unwrap(),
                         Ok(_) => {
-                            print_error("Provided input character is not alphabetic.");
+                            print_error("Provided input character isn't between A - G.");
                             continue;
                         }
                         Err(_) => {
@@ -50,29 +60,34 @@ impl super::GameCoordinator {
                             continue;
                         }
                     };
-                    let column = match input_buffer[1..2].parse::<u8>() {
-                        Ok(n) => n,
+                    let column_char = match input_buffer[1..2].parse::<u8>() {
+                        Ok(n) if (1..=7).contains(&n) => n,
+                        Ok(_) => {
+                            print_error("Second input char is not 1 <= && < 8.");
+                            continue;
+                        }
                         Err(_) => {
-                            print_error("Input is ill formatted. Second letter should be a number representing a row.");
+                            print_error("Second input char is not a number. Input is ill formatted.");
                             continue;
                         }
                     };
 
-                    break (row, column);
+                    break (row_char, column_char);
                 }
-                Err(error) => print_error(&format!("Error processing input: {error}",)),
+                Err(error) => print_error(&format!("Error occurred processing input: {error}",)),
             }
-        };
-        vaild_input
+        }
     }
 
-    /// Returns if mills were detected & returns them if so
-    /// Internally prints them out
-    pub fn check_for_and_get_mils(&self, last_updated_field: Field) -> Option<SmallVec<[Field; 5]>> {
+    /// Returns if mills were detected & returns them if so and prints them out
+    pub fn check_for_and_get_mils(&self, last_updated_field: Field) -> Option<SmallVec<[Field; 3]>> {
+
         let mills = self.play_field.get_mill_crossing(last_updated_field);
 
         // This hurts. And I'm not sure how to do better.
-        if mills.len() == 3 {
+        if mills.len() == 0 {
+            None
+        } else if mills.len() == 3 {
             let field_1 = mills[0];
             let field_2 = mills[1];
             let field_3 = mills[2];
@@ -83,9 +98,10 @@ impl super::GameCoordinator {
                     field_1.0, field_1.1, field_2.0, field_2.1, field_3.0, field_3.1,
                 ))
             );
-
             Some(mills)
-        } else if mills.len() == 6 {
+        } else {
+            assert!(mills.len() == 6);
+
             let field_1 = mills[0];
             let field_2 = mills[1];
             let field_3 = mills[2];
@@ -104,10 +120,7 @@ impl super::GameCoordinator {
                     field_4.0, field_4.1, field_5.0, field_5.1, field_6.0, field_6.1,
                 ))
             );
-
             Some(mills)
-        } else {
-            None
         }
     }
 
@@ -118,15 +131,17 @@ impl super::GameCoordinator {
     /// TODO This is to weak. If the player e.g. has 3 stones & all are in a mill, it must be skipped too...
     ///
     /// Returns true if a mill was detected for the [GamePhase] cases to trigger coordinative behavior.
-    pub fn mills_interaction(
+    pub fn do_mills_interaction(
         &mut self,
         input_field: (char, u8),
         player_color: crate::game::PlayerColor,
-    ) -> Option<SmallVec<[Field; 5]>> {
+    ) -> Option<SmallVec<[Field; 3]>> {
         if let Some(mills) = self.check_for_and_get_mils(input_field) {
-            self.print_play_field_highlighted(&mills);
-            let mut amount_of_mills = mills.len() / 3;
 
+            self.print_play_field_highlighted(&mills);
+
+            // A piece of a extreme case:
+            let mut amount_of_mills = mills.len() / 3;
             let mut stones_in_mills = 0;
             for coord in FIELD_LUT {
                 // Every mill should be detected exactly 3 times
@@ -164,7 +179,7 @@ impl super::GameCoordinator {
         }
     }
 
-    /// Prints out the current round, the state of the play field and messages for some phases of [GamePhase].
+    /// Prints (depending of the state of [GameCoordinator]) out the current round, the state of the play field and messages for some phases of [GamePhase].
     /// Also skips this print outs, if the provided [error_occurred] is true.
     /// Returns some convenient values needed in the game phases for coordination of the [PlayField].
     pub fn print_turn_header(
@@ -172,45 +187,40 @@ impl super::GameCoordinator {
         phase: GamePhase,
         black_rounds_done: Option<u32>,
         highlight: &[Field],
-        error_occurred: bool,
     ) -> (crate::game::PlayerColor, smartstring::SmartString<smartstring::Compact>) {
         let (player_name, player_color) = self.get_current_turns_attributes();
         let player_name = CompactString::from(player_name);
 
         // Print out the round and game field info, if no error occurred
-        if !error_occurred {
-            print!("\n\n\t\t  ===============\n");
-            print!("\t\t  === {} ===\n", HIGHLIGHT.paint(format!("Round {}", self.round)));
-            print!("\t\t  ===============\n\n");
+        if !self.error_state {
+            println!("\n\n\t\t  ===============");
+            println!("\t\t  === {} ===", HIGHLIGHT.paint(format!("Round {}", self.round)));
+            println!("\t\t  ===============\n");
 
-            match phase {
-                GamePhase::Set => {
-                    println!(
-                        "> {}, it's your turn placing a {} stone!",
-                        EMP.paint(player_name.as_str()),
-                        HIGHLIGHT.paint(player_color)
-                    );
-                    let (stones_white, stones_black) = self.play_field.amount_of_stones;
-                    println!(
-                        "\n> Amount of stones on the playfield: {}: {}, {}: {}",
-                        EMP.paint(&self.players.0),
-                        HIGHLIGHT.paint(stones_white),
-                        EMP.paint(&self.players.1),
-                        HIGHLIGHT.paint(stones_black)
-                    );
-                    println!(
-                        "> Stones left to set: {}",
-                        HIGHLIGHT.paint(9 - black_rounds_done.unwrap())
-                    );
-                }
-                GamePhase::MoveAndJump => {
-                    println!(
-                        "> {}, it's your turn making a move with {}!",
-                        EMP.paint(player_name.as_str()),
-                        HIGHLIGHT.paint(player_color)
-                    );
-                }
-                _ => panic!(),
+            if let GamePhase::Set = phase {
+                println!(
+                    "> {}, it's your turn placing a {} stone!",
+                    EMP.paint(player_name.as_str()),
+                    HIGHLIGHT.paint(player_color)
+                );
+                let (stones_white, stones_black) = self.play_field.amount_of_stones;
+                println!(
+                    "\n> Amount of stones on the playfield: {}: {}, {}: {}",
+                    EMP.paint(&self.player_names.0),
+                    HIGHLIGHT.paint(stones_white),
+                    EMP.paint(&self.player_names.1),
+                    HIGHLIGHT.paint(stones_black)
+                );
+                println!(
+                    "> Stones left to set: {}",
+                    HIGHLIGHT.paint(9 - black_rounds_done.unwrap())
+                );
+            } else if let GamePhase::MoveAndJump = phase {
+                println!(
+                    "> {}, it's your turn making a move with {}!",
+                    EMP.paint(player_name.as_str()),
+                    HIGHLIGHT.paint(player_color)
+                );
             }
 
             if !highlight.is_empty() {

@@ -41,27 +41,28 @@ impl PlayField {
     /// Maps the player visible fields notation to the internal errors state.
     ///
     /// Handles following extreme cases:
-    /// - The input character is not upper case - this is internally converted to uppercase by default
-    /// -> The input character can't be converted to upper case
+    /// (- The input character is not upper case - this is internally converted to uppercase by default)
+    /// (-> The input character can't be converted to upper case)
+    /// - This is handled by the input aquireing method
     /// - No array position of the LUT fits the input
-    ///
-    /// TODO: Calculate the uppercase by using arithmetic on chars rather than the idiomatic way
     pub fn map_to_state_index(&self, pos: Field) -> Result<usize, PlayFieldError> {
-        let as_uppercase = if let Some(c) = pos.0.to_uppercase().next() {
-            c
-        } else {
+        /*
+        let as_uppercase = if let Some(c) = pos.0.to_uppercase().next() { c } else {
             return Err(PlayFieldError::FieldTranslationMappingError {
                 erroneous_field: pos,
                 message: "Specified position character is not a valid column on the play field.",
             });
         };
         let pos = (as_uppercase, pos.1);
+        */
+
+        assert!(pos.0.is_uppercase());
+        assert!(('A'..='G').contains(&pos.0));
 
         let pos_index = FIELD_LUT
             .iter()
             .position(|lut_element| lut_element.0 == pos.0 && lut_element.1 == pos.1);
-        /*             .enumerate()
-        .find_map(|(i, &lut_pos)| if lut_pos == pos { Some(i) } else { None }); */
+        /*  .enumerate() .find_map(|(i, &lut_pos)| if lut_pos == pos { Some(i) } else { None }); */
 
         match pos_index {
             Some(i) => Ok(i),
@@ -91,9 +92,9 @@ impl PlayField {
     /// in the vertical relative triple of the [PlayField] state, and then for the same in the horizontal relative triple
     ///
     /// Returns a [SmallVec] due to the extreme case of two mills at once. & me being lazy/ confused with the return value modelling.
-    pub fn get_mill_crossing(&self, last_updated_field: Field) -> SmallVec<[Field; 5]> {
+    pub fn get_mill_crossing(&self, last_updated_field: Field) -> SmallVec<[Field; 3]> {
         // 5 because extreme case: two mills are detected
-        let mut r#return = SmallVec::<[Field; 5]>::new();
+        let mut r#return = SmallVec::<[Field; 3]>::new();
 
         // First: Check if mill exists on the horizontals, which is easy due to the representation as array
         let index = self.map_to_state_index(last_updated_field).unwrap();
@@ -180,7 +181,6 @@ impl PlayField {
             3 => 0,
             _ => panic!("Programmer's dumb lol"),
         };*/
-        // TODO Division through 0?!
         //let position_in_tripel = (position_in_coord_tripel - inlay) / moves_for_layer;
         // Special case: in the middle/ column D, there are two tuples
         //let position_in_tripel: u8 = if 3 < position_in_tripel {position_in_tripel - 4} else {position_in_tripel};
