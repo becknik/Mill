@@ -111,7 +111,7 @@ impl super::GameCoordinator {
     /// Handles the mill cross-check of the last field a stone was set upon.
     /// Includes the user interaction part for selecting a valid field on the [PlayField].
     /// Handled extreme cases:
-    /// - All stones on the play field are element of mills
+    /// - ~~All stones on the play field are element of mills~~
     /// TODO This is to weak. If the player e.g. has 3 stones & all are in a mill, it must be skipped too...
     ///
     /// Returns true if a mill was detected for the [GamePhase] cases to trigger coordinative behavior.
@@ -121,21 +121,21 @@ impl super::GameCoordinator {
         player_color: PlayerColor,
     ) -> Option<SmallVec<[Field; 3]>> {
         if let Some(mills) = self.check_for_and_get_mils(input_field) {
-            self.print_play_field_highlighted(&mills);
+            self.print_play_highlighted(Some(&mills));
 
             // A piece of a extreme case:
             let mut amount_of_mills = mills.len() / 3;
-            let stones_in_mills = 0;
+            //let stones_in_mills = 0;
             //for coord in FIELD_LUT {
             // Every mill should be detected exactly 3 times
             //stones_in_mills += self.play_field.get_mill_crossing(coord).len() / 3;
             //}
 
-            let (white_stones, black_stones) = self.play_field.amount_of_stones;
-            let all_stones_in_mills = stones_in_mills as u32 == (white_stones + black_stones);
+            //let (white_stones, black_stones) = self.play_field.amount_of_stones;
+            //let all_stones_in_mills = stones_in_mills as u32 == (white_stones + black_stones);
 
             // While here are mill on the last set position left & not all stones are element of a mill: Prompt to take stones
-            while 0 < amount_of_mills && !all_stones_in_mills {
+            while 0 < amount_of_mills /*&& !all_stones_in_mills*/ {
                 let field_to_take = self.get_field_coord_input("> Enter the stone do you want to take: ");
 
                 match self.play_field.try_take(field_to_take, player_color) {
@@ -143,8 +143,8 @@ impl super::GameCoordinator {
                         "> Successfully took stone on {}",
                         EMP.paint(format!("{}{}", field_to_take.0, field_to_take.1))
                     ),
-                    Err(message) => {
-                        print_error(message);
+                    Err(err) => {
+                        print_error(&format!("> Error occured taking stone: {}", err));
                         continue;
                     }
                 }
@@ -152,9 +152,9 @@ impl super::GameCoordinator {
                 amount_of_mills -= 1;
             }
 
-            if all_stones_in_mills {
+            /*if all_stones_in_mills {
                 println!("> Detected as many stones on the play field as mills. There is nothing to take.");
-            }
+            }*/
 
             Some(mills)
         } else {
@@ -207,9 +207,9 @@ impl super::GameCoordinator {
             }
 
             if !highlight.is_empty() {
-                self.print_play_field_highlighted(highlight);
+                self.print_play_highlighted(Some(highlight));
             } else {
-                self.print_play_field();
+                self.print_play_highlighted(None);
             }
         }
         (player_color, player_name)

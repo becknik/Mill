@@ -1,4 +1,4 @@
-pub mod painting;
+pub mod printing;
 pub mod representation;
 
 use self::representation::types::*;
@@ -25,6 +25,10 @@ pub enum PlayFieldError {
     InvalidProgramStateError {
         message: &'static str,
     },
+    FailedToTake {
+        field: Field,
+        message: &'static str,
+    }
 }
 
 use self::representation::constants::*;
@@ -170,22 +174,21 @@ impl PlayField {
 
     /// As the other try_... function, this one also checks cases in the context of the player's color &
     /// if it's permitted to proceed taking the specified stone
-    /// TODO Make custom error types for this
-    pub fn try_take(&mut self, field_to_take: Field, player_color: PlayerColor) -> Result<(), &'static str> {
+    pub fn try_take(&mut self, field_to_take: Field, player_color: PlayerColor) -> Result<(), PlayFieldError> {
         let field_state = match self.get_status_of(field_to_take) {
             Ok(state) => state,
-            Err(_) => return Err("Specified field is no valid game field"),
+            Err(_) => return Err(PlayFieldError::FailedToTake { field: field_to_take, message: "Specified field is no valid game field" }),
         };
 
         if field_state != player_color.into() && field_state != FieldState::Free {
             // If the field to take is in a mill
             if !self.get_mill_crossing(field_to_take).is_empty() {
-                return Err("The specified stone to take is in at lease one mill.");
+                return Err(PlayFieldError::FailedToTake { field: field_to_take, message: "The specified stone to take is in at lease one mill."});
             }
             self.take(field_to_take);
             Ok(())
         } else {
-            Err("The specified field must be covered with an opponent stone.")
+            Err(PlayFieldError::FailedToTake { field: field_to_take, message: "The specified field must be covered with an opponent stone."})
         }
     }
 }

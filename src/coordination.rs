@@ -213,19 +213,11 @@ impl GameCoordinator {
         }
     }
 
-    /// Wrapper for [print_plain] method of [PlayField], adding line breaks around it's output.
-    ///
-    fn print_play_field(&self) {
+    /// Wrapper for [print_plain] method of [PlayField], adding line breaks around it's output
+    /// It is able to highlight the game field on specified points - by using the ^2 rt complexity :(
+    fn print_play_highlighted(&self, to_highlight: Option<&[Field]>) {
         println!("\n");
-        self.play_field.print_plain();
-        println!("\n");
-    }
-
-    /// Just another wrapper, but able to highlight the game field on specified points - by using the ^2 rt complexity :(
-    /// If you ask me, it's worth it
-    fn print_play_field_highlighted(&self, to_highlight: &[Field]) {
-        println!("\n");
-        self.play_field.print_and_highlight(to_highlight);
+        self.play_field.print_highlighted(to_highlight);
         println!("\n");
     }
 }
