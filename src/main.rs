@@ -1,4 +1,6 @@
-use muehle_game::game::logic::GameCoordinator;
+use coordination::GameCoordinator;
+
+mod coordination;
 
 fn main() {
     let mut coordinator = GameCoordinator::setup();

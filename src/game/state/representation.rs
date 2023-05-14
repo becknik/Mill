@@ -1,15 +1,13 @@
 //! This module is taught to hold everything related to the internal representation of the [PlayField] state, including methods forming abstraction from it.
 use smallvec::SmallVec;
 
-use self::{
-    constants::FIELD_LUT,
-    types::{Field, FieldState},
-};
+use self::{constants::FIELD_LUT, types::FieldState};
 use super::{PlayField, PlayFieldError};
 
-pub mod constants {
+use crate::game::Field;
 
-    use super::super::Field;
+pub mod constants {
+    use crate::game::Field;
 
     pub const FIELD_COUNT: usize = 24;
 
@@ -26,8 +24,6 @@ pub mod constants {
 }
 
 pub mod types {
-
-    pub type Field = (char, u8);
 
     #[derive(Copy, Clone, PartialEq, Debug)]
     pub enum FieldState {

@@ -2,6 +2,7 @@ pub mod painting;
 pub mod representation;
 
 use self::representation::types::*;
+use crate::game::Field;
 
 #[derive(Debug)]
 pub enum PlayFieldError {

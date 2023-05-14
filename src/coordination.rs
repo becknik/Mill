@@ -1,29 +1,23 @@
 //! Contains the setup method for the [GameCoordinator] struct, which is meant to modify the [PlayField] state, receive & handle player input, set things up, enforce the play phases etc.
 //! This module holds the game loop & some auxiliary helper functions.
 
-pub mod constants {
-    use once_cell::sync::Lazy;
-    use yansi::Style;
+use muehle::game::{painting::*, Field, PlayerColor};
 
-    const EMP_COLOR: (u8, u8, u8) = (193, 49, 0);
-    pub static EMP: Lazy<Style> = Lazy::new(|| Style::new(yansi::Color::RGB(EMP_COLOR.0, EMP_COLOR.1, EMP_COLOR.2)));
+use muehle::game::state::PlayField;
 
-    pub static HIGHLIGHT: Lazy<Style> = Lazy::new(|| Style::new(yansi::Color::Blue));
-    pub static ERROR: Lazy<Style> = Lazy::new(|| Style::new(yansi::Color::Red).bold());
-}
-
-mod game_phases;
-
-use self::constants::*;
-
-use self::game_phases::*;
-
-use super::{
-    state::{representation::types::Field, PlayField},
-    PlayerColor,
-};
 use smallvec::SmallVec;
 use smartstring::alias::CompactString;
+
+mod game_phases;
+mod setup;
+
+#[derive(Clone, Copy)]
+pub enum GamePhase {
+    Start,
+    Set,
+    MoveAndJump,
+    Terminated,
+}
 
 pub struct GameCoordinator {
     play_field: PlayField,
@@ -92,8 +86,8 @@ impl GameCoordinator {
             if let Some(mut mills) = self.do_mills_interaction(input_field, player_color) {
                 changes_to_highlight.append(&mut mills);
                 //for mill in mills { TODO ?
-                    //if changes_to_highlight.contains(&mill) {
-                    //}
+                //if changes_to_highlight.contains(&mill) {
+                //}
                 //}
             };
 
@@ -101,7 +95,7 @@ impl GameCoordinator {
             self.round += 1;
             self.turn = !self.turn;
 
-			if let PlayerColor::Black = player_color {
+            if let PlayerColor::Black = player_color {
                 set_rounds_done += 1;
             }
         }
@@ -109,9 +103,8 @@ impl GameCoordinator {
         self.game_phase = GamePhase::MoveAndJump;
         println!("\n> Starting with {}!", EMP.paint("Move-Phase"));
 
-		while let GamePhase::MoveAndJump = self.game_phase {
-            let (player_color, player_name) =
-                self.print_turn_header(self.game_phase, None, &changes_to_highlight);
+        while let GamePhase::MoveAndJump = self.game_phase {
+            let (player_color, player_name) = self.print_turn_header(self.game_phase, None, &changes_to_highlight);
 
             changes_to_highlight.clear();
             let start_field = self.get_field_coord_input("> Enter the stone you want to move: ");
@@ -137,10 +130,10 @@ impl GameCoordinator {
             }
 
             if let Some(mut mills) = self.do_mills_interaction(target_field, player_color) {
-                    changes_to_highlight.append(&mut mills);
+                changes_to_highlight.append(&mut mills);
             }
 
-			// The opponent of the current play might have lost a stone:
+            // The opponent of the current play might have lost a stone:
             let player_and_amount_of_stones = match player_color {
                 PlayerColor::White => (&self.player_names.1, self.play_field.amount_of_stones.1),
                 PlayerColor::Black => (&self.player_names.0, self.play_field.amount_of_stones.0),

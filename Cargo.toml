@@ -1,5 +1,5 @@
 [package]
-name = "muehle-game"
+name = "muehle"
 version = "0.1.0"
 authors = ["Jannik Becker <jannikb@posteo.de>"]
 edition = "2021"

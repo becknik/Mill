@@ -277,7 +277,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "muehle-game"
+name = "muehle"
 version = "0.1.0"
 dependencies = [
  "criterion",

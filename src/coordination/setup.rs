@@ -1,11 +1,10 @@
 use std::io::{self, Write};
 
-use crate::game::{
-    logic::{print_error, GameCoordinator, EMP, HIGHLIGHT},
-    state::PlayField,
-};
+use muehle::game::{painting::*, state::PlayField};
 
-use super::GamePhase;
+use crate::coordination::print_error;
+
+use super::{GameCoordinator, GamePhase};
 
 impl GameCoordinator {
     pub fn setup() -> Self {
@@ -73,7 +72,7 @@ impl GameCoordinator {
             println!(
                 "> Which player wants to play with the {} >>{}<<?",
                 HIGHLIGHT.paint("white stones"),
-                HIGHLIGHT.paint(crate::game::PlayerColor::White)
+                HIGHLIGHT.paint(muehle::game::PlayerColor::White)
             );
             print!(
                 "> Please enter a {} or the {}: ",
@@ -93,7 +92,6 @@ impl GameCoordinator {
                     } else if input_buffer == self.player_names.1 {
                         break true;
                     } else if let Ok(int) = input_buffer.parse::<i32>() {
-
                         if !(1..3).contains(&int) {
                             print_error(error_message);
                         } else {

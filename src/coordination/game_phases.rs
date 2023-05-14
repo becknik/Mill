@@ -1,25 +1,10 @@
 use std::io::{self, Write};
 
+use muehle::game::{painting::*, Field, PlayerColor};
 use smallvec::SmallVec;
 use smartstring::alias::CompactString;
 
-use crate::game::{
-    logic::{
-        constants::{EMP, HIGHLIGHT},
-        print_error,
-    },
-    state::representation::{constants::FIELD_LUT, types::Field},
-};
-
-mod early;
-
-#[derive(Clone, Copy)]
-pub enum GamePhase {
-    Start,
-    Set,
-    MoveAndJump,
-    Terminated,
-}
+use super::{print_error, GamePhase};
 
 impl super::GameCoordinator {
     /// Returns valid coordinates of the game field in A_G, 1-7 mapping. The coordinate is requested after printing out the message argument
@@ -76,12 +61,11 @@ impl super::GameCoordinator {
                 }
                 Err(error) => print_error(&format!("Error occurred processing input: {error}",)),
             }
-        }
+        };
     }
 
     /// Returns if mills were detected & returns them if so and prints them out
     pub fn check_for_and_get_mils(&self, last_updated_field: Field) -> Option<SmallVec<[Field; 3]>> {
-
         let mills = self.play_field.get_mill_crossing(last_updated_field);
 
         // This hurts. And I'm not sure how to do better.
@@ -134,19 +118,18 @@ impl super::GameCoordinator {
     pub fn do_mills_interaction(
         &mut self,
         input_field: (char, u8),
-        player_color: crate::game::PlayerColor,
+        player_color: PlayerColor,
     ) -> Option<SmallVec<[Field; 3]>> {
         if let Some(mills) = self.check_for_and_get_mils(input_field) {
-
             self.print_play_field_highlighted(&mills);
 
             // A piece of a extreme case:
             let mut amount_of_mills = mills.len() / 3;
-            let mut stones_in_mills = 0;
-            for coord in FIELD_LUT {
-                // Every mill should be detected exactly 3 times
-                stones_in_mills += self.play_field.get_mill_crossing(coord).len() / 3;
-            }
+            let stones_in_mills = 0;
+            //for coord in FIELD_LUT {
+            // Every mill should be detected exactly 3 times
+            //stones_in_mills += self.play_field.get_mill_crossing(coord).len() / 3;
+            //}
 
             let (white_stones, black_stones) = self.play_field.amount_of_stones;
             let all_stones_in_mills = stones_in_mills as u32 == (white_stones + black_stones);
@@ -187,7 +170,7 @@ impl super::GameCoordinator {
         phase: GamePhase,
         black_rounds_done: Option<u32>,
         highlight: &[Field],
-    ) -> (crate::game::PlayerColor, smartstring::SmartString<smartstring::Compact>) {
+    ) -> (PlayerColor, CompactString) {
         let (player_name, player_color) = self.get_current_turns_attributes();
         let player_name = CompactString::from(player_name);
 

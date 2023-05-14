@@ -6,20 +6,15 @@ use std::slice::Iter;
 
 use smallvec::SmallVec;
 
-use crate::game::state::representation::constants::FIELD_COUNT;
-use crate::game::PlayerColor;
-
-use super::super::logic;
-
-use super::representation::types::Field;
 use super::{FieldState, PlayField, PlayFieldError};
+use crate::game::Field;
 
 impl Display for FieldState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             FieldState::Free => f.write_str("·"),
-            FieldState::White => PlayerColor::White.fmt(f),
-            FieldState::Black => PlayerColor::Black.fmt(f),
+            FieldState::White => crate::game::PlayerColor::White.fmt(f),
+            FieldState::Black => crate::game::PlayerColor::Black.fmt(f),
         }
     }
 }
@@ -193,10 +188,14 @@ impl PlayField {
     fn unwrap_and_highligth(&self, iter: &mut Enumerate<Rev<Iter<FieldState>>>, to_highlight: &[usize]) -> String {
         let next_element = iter.next().unwrap();
         // The abs_diff is necessary due to the field getting printed from top to bottom, therefore the indices must start with the upper elements
-        let highlight_element = to_highlight.contains(&next_element.0.abs_diff(FIELD_COUNT - 1));
+        let highlight_element = to_highlight.contains(
+            &next_element
+                .0
+                .abs_diff(super::representation::constants::FIELD_COUNT - 1),
+        );
 
         if highlight_element {
-            logic::constants::EMP.paint(&next_element.1).to_string()
+            crate::game::painting::EMP.paint(&next_element.1).to_string()
         } else {
             next_element.1.to_string()
         }
