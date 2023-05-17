@@ -69,7 +69,7 @@ impl super::GameCoordinator {
         let mills = self.play_field.get_mill_crossing(last_updated_field);
 
         // This hurts. And I'm not sure how to do better.
-        if mills.len() == 0 {
+        if mills.is_empty() {
             None
         } else if mills.len() == 3 {
             let field_1 = mills[0];
@@ -135,7 +135,9 @@ impl super::GameCoordinator {
             //let all_stones_in_mills = stones_in_mills as u32 == (white_stones + black_stones);
 
             // While here are mill on the last set position left & not all stones are element of a mill: Prompt to take stones
-            while 0 < amount_of_mills /*&& !all_stones_in_mills*/ {
+            while 0 < amount_of_mills
+            /*&& !all_stones_in_mills*/
+            {
                 let field_to_take = self.get_field_coord_input("> Enter the stone do you want to take: ");
 
                 match self.play_field.try_take(field_to_take, player_color) {

@@ -8,8 +8,8 @@ use super::{GameCoordinator, GamePhase};
 
 impl GameCoordinator {
     pub fn setup() -> Self {
-        let mut player1: Option<String> = None;
-        let player2: Option<String>;
+        let mut player_1: Option<String> = None;
+        let player_2: Option<String>;
         let mut current_player_assigned_to = 1;
 
         loop {
@@ -29,20 +29,20 @@ impl GameCoordinator {
                         continue;
                     }
 
-                    if player1 == None {
-                        player1 = Some(input_buffer.to_string());
+                    if player_1.is_none() {
+                        player_1 = Some(input_buffer.to_string());
                         current_player_assigned_to += 1;
 
                         // .clone().unwrap() looks like bad library design for me...
-                        println!("> Here we go, {}!", EMP.paint(player1.clone().unwrap()));
+                        println!("> Here we go, {}!", EMP.paint(player_1.clone().unwrap()));
                     } else {
-                        if player1.clone().unwrap() == input_buffer {
+                        if player_1.clone().unwrap() == input_buffer {
                             print_error("Player are the same.");
                             continue;
                         }
-                        player2 = Some(input_buffer.to_string());
+                        player_2 = Some(input_buffer.to_string());
 
-                        println!("> Here we go, {}!", EMP.paint(player2.clone().unwrap()));
+                        println!("> Here we go, {}!", EMP.paint(player_2.clone().unwrap()));
                         break;
                     }
                 }
@@ -52,10 +52,10 @@ impl GameCoordinator {
         println!();
 
         GameCoordinator {
-            play_field: PlayField::new(),
+            play_field: PlayField::default(),
             player_names: (
-                smartstring::alias::CompactString::from(player1.unwrap()),
-                smartstring::alias::CompactString::from(player2.unwrap()),
+                smartstring::alias::CompactString::from(player_1.unwrap()),
+                smartstring::alias::CompactString::from(player_2.unwrap()),
             ),
             round: 0,
             game_phase: GamePhase::Start,

@@ -28,7 +28,7 @@ pub enum PlayFieldError {
     FailedToTake {
         field: Field,
         message: &'static str,
-    }
+    },
 }
 
 use self::representation::constants::*;
@@ -41,14 +41,16 @@ pub struct PlayField {
     pub amount_of_stones: (u32, u32),
 }
 
-impl PlayField {
-    pub fn new() -> PlayField {
-        PlayField {
+impl Default for PlayField {
+    fn default() -> Self {
+        Self {
             state: [FieldState::Free; FIELD_COUNT],
             amount_of_stones: (0, 0),
         }
     }
+}
 
+impl PlayField {
     /// Sets a sone to the specified position by calling the [get_status_of] method.
     /// Then modifies the interior [state] array
     ///
@@ -177,18 +179,29 @@ impl PlayField {
     pub fn try_take(&mut self, field_to_take: Field, player_color: PlayerColor) -> Result<(), PlayFieldError> {
         let field_state = match self.get_status_of(field_to_take) {
             Ok(state) => state,
-            Err(_) => return Err(PlayFieldError::FailedToTake { field: field_to_take, message: "Specified field is no valid game field" }),
+            Err(_) => {
+                return Err(PlayFieldError::FailedToTake {
+                    field: field_to_take,
+                    message: "Specified field is no valid game field",
+                })
+            }
         };
 
         if field_state != player_color.into() && field_state != FieldState::Free {
             // If the field to take is in a mill
             if !self.get_mill_crossing(field_to_take).is_empty() {
-                return Err(PlayFieldError::FailedToTake { field: field_to_take, message: "The specified stone to take is in at lease one mill."});
+                return Err(PlayFieldError::FailedToTake {
+                    field: field_to_take,
+                    message: "The specified stone to take is in at lease one mill.",
+                });
             }
             self.take(field_to_take);
             Ok(())
         } else {
-            Err(PlayFieldError::FailedToTake { field: field_to_take, message: "The specified field must be covered with an opponent stone."})
+            Err(PlayFieldError::FailedToTake {
+                field: field_to_take,
+                message: "The specified field must be covered with an opponent stone.",
+            })
         }
     }
 }
