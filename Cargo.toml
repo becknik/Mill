@@ -11,9 +11,6 @@ smartstring = "1.0.1"
 once_cell = "1.17.1"
 either = "1.8.1"
 
-[dev-dependencies]
-criterion = "0.4"
-
 [profile.dev]
 opt-level = 1
 
@@ -22,3 +19,12 @@ lto = true # = fat lto, lto = "thin" might be preferable
 codegen-units = 1 # disable codegen unit parallelization to higher the optimization potential
 panic = "abort" # disables catch or unwind panics, reduces binary size & might increase performance slightly
 strip = true
+
+[dev-dependencies]
+criterion = "0.4"
+nanorand = "0.7.0"
+#oorandom = "11.1.3"
+
+[[bench]]
+harness = false
+name = "criterion_benchmarks"

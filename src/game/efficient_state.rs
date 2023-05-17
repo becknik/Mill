@@ -21,7 +21,7 @@ mod printing;
 /// - 01: white
 /// - 10: black
 /// - 11: undefined -> assert panic!
-#[derive(Clone, Eq, PartialEq, PartialOrd, Hash, Default)]
+#[derive(Copy, Clone, Eq, PartialEq, PartialOrd, Hash, Default)]
 pub struct EfficientPlayField {
     state: [u16; 3],
 }
@@ -36,7 +36,7 @@ impl EfficientPlayField {
     /// Handled extreme cases:
     /// - Ensures that black or white fields are replaced by free, vice versa
     /// - The input parameters must have values that make sense, ring_index < 3, index < 8, state < 3
-    fn set_field(&mut self, ring_index: usize, index: u32, field_state: u32) {
+    pub fn set_field(&mut self, ring_index: usize, index: u32, field_state: u32) {
         // Ensures no 11 exists in the state array
         assert!(
             {
@@ -110,26 +110,27 @@ impl EfficientPlayField {
         self.state[2] = buff; */
     }
 
-    // TODO use the be/le methods from primitives on slices for this?
     fn mirror_on_y(&mut self) {
         for ring_index in 0..3 {
-            let i_1 = 0b0000000000001100 & self.state[ring_index];
-            let i_2 = 0b0000000000110000 & self.state[ring_index];
-            let i_3 = 0b0000000011000000 & self.state[ring_index];
+            let i_1 = (3u16 << 2) & self.state[ring_index];
+            let i_2 = (3u16 << 4) & self.state[ring_index];
+            let i_3 = (3u16 << 6) & self.state[ring_index];
 
-            let i_5 = 0b0000110000000000 & self.state[ring_index];
-            let i_6 = 0b0011000000000000 & self.state[ring_index];
-            let i_7 = 0b1100000000000000 & self.state[ring_index];
+            let i_5 = (3u16 << 10) & self.state[ring_index];
+            let i_6 = (3u16 << 12) & self.state[ring_index];
+            let i_7 = (3u16 << 14) & self.state[ring_index];
 
-            let i_0_4 = 0b0000001100000011 & self.state[ring_index];
+            // Stancil out the first & fourth index
+            let i_0_4 = 0b00000011_00000011u16 & self.state[ring_index];
 
+            // Swap the game field's sides
             self.state[ring_index] = i_0_4
-                | (i_1 << (6 * 2))
-                | (i_2 << (4 * 2))
-                | (i_3 << (2 * 2))
-                | (i_5 >> (2 * 2))
-                | (i_6 >> (4 * 2))
-                | (i_7 >> (6 * 2));
+                | (i_1 << 12)
+                | (i_2 << 8)
+                | (i_3 << 4)
+                | (i_5 >> 4)
+                | (i_6 >> 8)
+                | (i_7 >> 12);
 
             /*
             let start_index = 1;
@@ -145,8 +146,9 @@ impl EfficientPlayField {
     /// The canonical form of EfficientPlayField ist created by selecting the length-lexicographical largest variant
     /// of the elements in the equivalent class
     // TODO &mut might be a failure... micro benchmark this!
-    fn get_canonical_form(&mut self) -> EfficientPlayField {
-        let mut canonical_form = EfficientPlayField { state: [0x0; 3] };
+    // pub because of benchmarking
+    pub fn get_canonical_form(&mut self) -> EfficientPlayField {
+        let mut canonical_form = EfficientPlayField::default();
 
         for _i in 0..2 {
             for _j in 0..4 {
@@ -184,7 +186,7 @@ impl EfficientPlayField {
     }
 }
 
-fn process_input_felder_txt() {
+pub fn process_input_felder_txt() {
     let input_felder_txt =
         File::open("input_felder.txt").expect("The 'input_felder.txt' file was not found in the projects root...");
     let reader = BufReader::new(input_felder_txt);
