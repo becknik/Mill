@@ -1,4 +1,5 @@
 /// The purpose of this module is to share contents which are important for the games coordination (player handling, game phase enforcement) and the play field storing the state of the game and abstractions around it.
+
 pub mod game {
 
     use std::fmt::Display;
@@ -17,6 +18,7 @@ pub mod game {
         pub static ERROR: Lazy<Style> = Lazy::new(|| Style::new(yansi::Color::Red).bold());
     }
 
+    pub mod efficient_state;
     pub mod state;
 
     pub type Field = (char, u8);
