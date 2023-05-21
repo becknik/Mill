@@ -123,7 +123,7 @@ impl EfficientPlayField {
             let i_7 = (3u16 << 14) & self.state[ring_index];
 
             // Stancil out the first & fourth index
-            let i_0_4 = 0b00000011_00000011u16 & self.state[ring_index];
+            let i_0_4 = 0b0000_0011_0000_0011u16 & self.state[ring_index];
 
             // Swap the game field's sides
             self.state[ring_index] =
@@ -143,12 +143,12 @@ impl EfficientPlayField {
             for _j in 0..4 {
                 self.mirror_on_y();
                 if self > &mut canonical_form {
-                    canonical_form = self.clone()
+                    canonical_form = *self
                 }
 
                 self.mirror_on_y();
                 if self > &mut canonical_form {
-                    canonical_form = self.clone()
+                    canonical_form = *self
                 }
 
                 self.rotate_self_right(1);
@@ -183,6 +183,9 @@ impl EfficientPlayField {
         let mut moves_possible_counter = 0;
         let mut moves_to_mill_counter = 0;
         let mut stones_to_take_counter = 0;
+
+        // Used for the extreme case when all stones of the opponent are in a mill
+        let mut overall_stones_of_opposite_color_counter = 0;
 
         for ring_index in 0..3 {
             for field_index in (0..16).step_by(2) {
@@ -272,17 +275,26 @@ impl EfficientPlayField {
                 }
                 // The opposite colors amount of stones which can be taken should be counted, which is if the stone
                 // Isn't inside a mill!
-                else if self.get_mill_count(
-                    ring_index,
-                    field_index,
-                    DirectionToCheck::OnAndAcrossRings {
-                        player_color: current_field_state,
-                    },
-                ) == 0
-                {
-                    stones_to_take_counter += 1;
+                else {
+                    overall_stones_of_opposite_color_counter += 1;
+
+                    if self.get_mill_count(
+                        ring_index,
+                        field_index,
+                        DirectionToCheck::OnAndAcrossRings {
+                            player_color: current_field_state,
+                        },
+                    ) == 0
+                    {
+                        stones_to_take_counter += 1;
+                    }
                 }
             }
+        }
+
+        if stones_to_take_counter == 0 {
+            // All stones of the opposite color are in a mill:
+            stones_to_take_counter = overall_stones_of_opposite_color_counter;
         }
 
         (moves_possible_counter, moves_to_mill_counter, stones_to_take_counter)
@@ -315,7 +327,7 @@ impl EfficientPlayField {
             // Setting the state of the other index, which must be empty
             self.state[target_ring_index] |= color << start_fields_index;
 
-			// TODO makes this sense to you, future me? :|
+            // TODO makes this sense to you, future me? :|
             let mills_possible = self.get_mill_count(target_ring_index, start_fields_index, DirectionToCheck::OnRing);
             //let mills_possible = self.get_mill_count(target_ring_index, start_fields_index, DirectionToCheck::OnAndAcrossRings { player_color: color });
 
@@ -368,7 +380,7 @@ impl EfficientPlayField {
         */
         let indices_to_rotate = (field_index - (field_index % 4) + 14) % 16;
         // Field state triple containing field_index:
-        let state_triple = self.state[ring_index].rotate_right(indices_to_rotate) & 0b00000000_00111111u16;
+        let state_triple = self.state[ring_index].rotate_right(indices_to_rotate) & 0b0000_0000_0011_1111u16;
 
         /* 010101 | 101010 */
         if state_triple == 21u16 || state_triple == 42u16 {
@@ -377,7 +389,7 @@ impl EfficientPlayField {
 
         // If index is located in an edge, two triples must be checked for mill occurrence
         if field_index == 2 || field_index == 6 || field_index == 10 || field_index == 14 {
-            let state_triple = self.state[ring_index].rotate_right(field_index) & 0b00000000_00111111u16;
+            let state_triple = self.state[ring_index].rotate_right(field_index) & 0b000_00000_0011_1111u16;
             /* 010101 | 101010 */
             if state_triple == 21u16 || state_triple == 42u16 {
                 mill_counter += 1;
@@ -392,7 +404,8 @@ impl EfficientPlayField {
                 //assert!(((self.state[ring_index] >> field_index) & 3u16) != 0);
 
                 let next_indexs_field_state = (self.state[(ring_index + 1) % 3] & (3u16 << field_index)) >> field_index;
-                let next_next_indexs_field_state = (self.state[(ring_index + 2) % 3] & (3u16 << field_index)) >> field_index;
+                let next_next_indexs_field_state =
+                    (self.state[(ring_index + 2) % 3] & (3u16 << field_index)) >> field_index;
 
                 // Mill in between rings:
                 if next_indexs_field_state == player_color && next_indexs_field_state == next_next_indexs_field_state {
