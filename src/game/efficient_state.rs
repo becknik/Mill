@@ -207,7 +207,7 @@ impl EfficientPlayField {
                                 ring_index,
                                 field_index,
                                 neighbor_index,
-                                player_color.into(),
+                                current_field_state,
                             );
                         }
                     }
@@ -226,7 +226,7 @@ impl EfficientPlayField {
                                     0,
                                     1,
                                     field_index,
-                                    player_color.into(),
+                                    current_field_state,
                                 )
                             }
                             // Mid Ring
@@ -238,7 +238,7 @@ impl EfficientPlayField {
                                         1,
                                         0,
                                         field_index,
-                                        player_color.into(),
+                                        current_field_state,
                                     )
                                 }
 
@@ -249,7 +249,7 @@ impl EfficientPlayField {
                                         1,
                                         2,
                                         field_index,
-                                        player_color.into(),
+                                        current_field_state,
                                     )
                                 }
                             }
@@ -261,7 +261,7 @@ impl EfficientPlayField {
                                     2,
                                     1,
                                     field_index,
-                                    player_color.into(),
+                                    current_field_state,
                                 )
                             }
                             _ => {}
@@ -273,7 +273,7 @@ impl EfficientPlayField {
                 else if self.get_mill_count(
                     ring_index,
                     field_index,
-                    DirectionToCheck::OnAndAcrossRings((!player_color).into()),
+                    DirectionToCheck::OnAndAcrossRings(current_field_state),
                 ) == 0
                 {
                     stones_to_take_counter += 1;
@@ -366,10 +366,12 @@ impl EfficientPlayField {
         6,7 => 5
         7 => 7
         */
+        let indices_to_rotate = (field_index - (field_index % 4) + 14) % 16;
+
         match field_index {
             0 | 4 | 8 | 12 => {
                 let triple_state =
-                    self.state[ring_index].rotate_right((field_index + 14/* = -2 */) % 16) & 0b00000000_00111111u16;
+                    self.state[ring_index].rotate_right(indices_to_rotate) & 0b00000000_00111111u16;
                 /* 010101 | 101010 */
                 if triple_state == 21u16 || triple_state == 42u16 {
                     mill_counter += 1;
@@ -377,7 +379,7 @@ impl EfficientPlayField {
             }
             2 | 6 | 10 | 14 => {
                 let first_triple_state =
-                    self.state[ring_index].rotate_right((field_index + 12/* = -4 */) % 16) & 0b00000000_00111111u16;
+                    self.state[ring_index].rotate_right(indices_to_rotate) & 0b00000000_00111111u16;
                 /* 010101 | 101010 */
                 if first_triple_state == 21u16 || first_triple_state == 42u16 {
                     mill_counter += 1;
@@ -389,7 +391,7 @@ impl EfficientPlayField {
                     mill_counter += 1;
                 }
             }
-            _ => panic!(),
+            _ => {/* panic!() - removed for performance reasons */},
         }
 
         // Argument field index in the middle of a triple and therefore can form a mill connected to the other rings
