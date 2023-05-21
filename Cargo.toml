@@ -15,7 +15,7 @@ either = "1.8.1"
 opt-level = 1
 
 [profile.release]
-lto = true # = fat lto, lto = "thin" might be preferable
+lto = "thin" # = fat lto, lto = "thin" might be preferable
 codegen-units = 1 # disable codegen unit parallelization to higher the optimization potential
 panic = "abort" # disables catch or unwind panics, reduces binary size & might increase performance slightly
 strip = true
