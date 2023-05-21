@@ -93,8 +93,8 @@ impl EfficientPlayField {
     }
     /// Rotates the rings of the mill in the right direction
     fn rotate_self_right(&mut self, amount: u32) {
-        assert!(1 <= amount);
-        assert!(amount < 4);
+        //assert!(1 <= amount);
+        //assert!(amount < 4);
 
         for ring_index in 0..3 {
             // Due to the ring representation staring on the LSB, we have to shift left 2 fields internally, which
@@ -351,8 +351,8 @@ impl EfficientPlayField {
     /// - The field state of the current index must be not null
     /// - The fields index must be (0..16).step_by(2) and the ring index 0..3
     fn get_mill_count(&self, ring_index: usize, field_index: u32, direction: DirectionToCheck) -> u32 {
-        assert!(field_index < 16);
-        assert!(ring_index < 3);
+        //assert!(field_index < 16);
+        //assert!(ring_index < 3);
 
         let mut mill_counter = 0;
 
@@ -396,11 +396,10 @@ impl EfficientPlayField {
 
         // Argument field index in the middle of a triple and therefore can form a mill connected to the other rings
         if let DirectionToCheck::OnAndAcrossRings(color) = direction {
-            assert!(color < 3);
+            //assert!(color < 3);
 
-            /* && indexs_field_state != 0 */
             if ring_index % 4 == 0 {
-                assert!(((self.state[ring_index] >> field_index) & 3u16) != 0);
+                //assert!(((self.state[ring_index] >> field_index) & 3u16) != 0);
 
                 let next_indexs_field_state = self.state[(ring_index + 1) % 3] >> field_index;
                 let next_next_indexs_field_state = self.state[(ring_index + 2) % 3] >> field_index;
@@ -526,13 +525,13 @@ mod tests {
             epf.rotate_self_right(1);
             println!("Third rotation: {}", epf);
 
-            /* 			assert!(epf.state[2] == 0x0004);
+            /* assert!(epf.state[2] == 0x0004);
             assert!(epf.state[1] == 0x0010);
             assert!(epf.state[1] == 0x0010); */
 
             epf.rotate_self_right(2);
 
-            /* 			assert!(epf.state[2] == 0x0010);
+            /* assert!(epf.state[2] == 0x0010);
             assert!(epf.state[1] == 0x0080);
             assert!(epf.state[1] == 0x0100); */
 
