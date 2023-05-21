@@ -2,7 +2,7 @@
 
 pub mod game {
 
-    use std::fmt::Display;
+    use std::{fmt::Display, ops::Not};
 
     use self::state::representation::types::FieldState;
 
@@ -25,8 +25,8 @@ pub mod game {
 
     #[derive(Debug, Clone, Copy)]
     pub enum PlayerColor {
-        White = 0b01,
-        Black = 0b10,
+        White,
+        Black,
     }
 
     impl Display for PlayerColor {
@@ -43,6 +43,28 @@ pub mod game {
             match self {
                 PlayerColor::White => FieldState::White,
                 PlayerColor::Black => FieldState::Black,
+            }
+        }
+    }
+
+    impl Into<u16> for PlayerColor {
+        /// Needed for the [EfficientPlayField] representation of the enum
+        fn into(self) -> u16 {
+            match self {
+                PlayerColor::White => 1u16,
+                PlayerColor::Black => 2u16,
+            }
+        }
+    }
+
+    impl Not for PlayerColor {
+        type Output = PlayerColor;
+
+        fn not(self) -> Self::Output {
+            if let PlayerColor::White = self {
+                PlayerColor::Black
+            } else {
+                PlayerColor::White
             }
         }
     }

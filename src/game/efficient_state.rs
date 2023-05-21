@@ -9,6 +9,8 @@ use std::{
     io::{BufRead, BufReader, BufWriter, Write},
 };
 
+use super::{state, PlayerColor};
+
 mod de_encode;
 mod printing;
 
@@ -53,20 +55,20 @@ impl EfficientPlayField {
 
         assert!(index < 8u32, "Index is greater than 0x07");
 
-        assert!(field_state < 3u32, "New field state is larger than 0x04");
+        assert!(field_state < 3u32, "New field state is larger than 0x03");
 
         let old_ring_state = self.state[ring_index];
         // Assert target field is free, when field_state to is not
         if field_state != 0x0 {
             assert!(
-                (old_ring_state & (0x3 << (index * 2))) == 0x0,
+                (old_ring_state & (3u16 << (index * 2))) == 0,
                 "Tried to place non-free on non-free"
             );
         // Assert target field is not free, when field_state is
         } else {
             assert!(
-                (old_ring_state & (0x3 << (index * 2))) != 0x0,
-                "Tried to place white on free on free"
+                (old_ring_state & (3u16 << (index * 2))) != 0,
+                "Tried to place free on free"
             );
         }
 
@@ -124,22 +126,8 @@ impl EfficientPlayField {
             let i_0_4 = 0b00000011_00000011u16 & self.state[ring_index];
 
             // Swap the game field's sides
-            self.state[ring_index] = i_0_4
-                | (i_1 << 12)
-                | (i_2 << 8)
-                | (i_3 << 4)
-                | (i_5 >> 4)
-                | (i_6 >> 8)
-                | (i_7 >> 12);
-
-            /*
-            let start_index = 1;
-            for delta in (6..=2).step_by(2) {
-                let current_right_fields_val = self.state[ring_index] & (0x3 << 2 * start_index);
-                self.state[ring_index] = (self.state[ring_index] ^ (0x03 << ((start_index * 2) + delta))) | (current_right_fields_val << delta);
-            } */
-            //let left_and_right_indices_state = self.state[i] & 0b1111110011111100;
-            //self.state[i] = (self.state[i] & 0b0000001100000011) | (left_and_right_indices_state >> 8) | (left_and_right_indices_state << 8);
+            self.state[ring_index] =
+                i_0_4 | (i_1 << 12) | (i_2 << 8) | (i_3 << 4) | (i_5 >> 4) | (i_6 >> 8) | (i_7 >> 12);
         }
     }
 
@@ -147,6 +135,7 @@ impl EfficientPlayField {
     /// of the elements in the equivalent class
     // TODO &mut might be a failure... micro benchmark this!
     // pub because of benchmarking
+    #[inline]
     pub fn get_canonical_form(&mut self) -> EfficientPlayField {
         let mut canonical_form = EfficientPlayField::default();
 
@@ -176,17 +165,267 @@ impl EfficientPlayField {
         &mut self,
         other_play_field: &mut EfficientPlayField,
     ) -> Option<EfficientPlayField> {
-        let canoncial_form_1 = self.get_canonical_form();
+        let canonical_form_1 = self.get_canonical_form();
 
-        if canoncial_form_1 == other_play_field.get_canonical_form() {
-            Some(canoncial_form_1)
+        if canonical_form_1 == other_play_field.get_canonical_form() {
+            Some(canonical_form_1)
         } else {
             None
         }
     }
+
+    /// Calculates the possible moves of player_color, the amount of moves wich lead to a mill for player_color
+    /// and the amount of stones of the other player color, which can be beaten
+    ///
+    /// It is possibly used as a judging function for the player agent
+    #[inline]
+    pub fn get_move_triple(&mut self, player_color: PlayerColor) -> (u32, u32, u32) {
+        let mut moves_possible_counter = 0;
+        let mut moves_to_mill_counter = 0;
+        let mut stones_to_take_counter = 0;
+
+        for ring_index in 0..3 {
+            for field_index in (0..16).step_by(2) {
+                // Current field state sifted to the LSB
+                let current_field_state = (self.state[ring_index] & (3u16 << field_index)) >> field_index;
+
+                // If the current field is empty, we wont make any adjustments to the return values
+                if current_field_state == 0 {
+                    continue;
+                }
+
+                // In this branch the current colors possible moves & => movements into a mill should be figured out
+                if current_field_state == player_color.into() {
+                    let ring_neighbors_indices = [(field_index + 14) % 16, (field_index + 18) % 16];
+
+                    for neighbor_index in ring_neighbors_indices {
+                        // Neighbor field state is empty - neighbor_index already are representational index (0 <= i < 16)
+                        if (self.state[ring_index] & (3u16 << neighbor_index)) == 0 {
+                            moves_possible_counter += 1;
+
+                            moves_to_mill_counter += self.on_ring_get_mills_after_simulating_move(
+                                ring_index,
+                                field_index,
+                                neighbor_index,
+                                player_color.into(),
+                            );
+                        }
+                    }
+
+                    // Check for possible over-ring moves
+                    if (field_index % 4) == 0 {
+                        let next_rings_field_state = self.state[(ring_index + 1) % 3] & (3u16 << field_index);
+                        let previous_rings_field_state = self.state[(ring_index + 2) % 3] & (3u16 << field_index);
+
+                        match ring_index {
+                            // Inner Ring
+                            0 if next_rings_field_state == 0 => {
+                                moves_possible_counter += 1;
+
+                                moves_to_mill_counter += self.across_rings_get_mills_after_simulating_move(
+                                    0,
+                                    1,
+                                    field_index,
+                                    player_color.into(),
+                                )
+                            }
+                            // Mid Ring
+                            1 => {
+                                if previous_rings_field_state == 0 {
+                                    moves_possible_counter += 1;
+
+                                    moves_to_mill_counter += self.across_rings_get_mills_after_simulating_move(
+                                        1,
+                                        0,
+                                        field_index,
+                                        player_color.into(),
+                                    )
+                                }
+
+                                if next_rings_field_state == 0 {
+                                    moves_possible_counter += 1;
+
+                                    moves_to_mill_counter += self.across_rings_get_mills_after_simulating_move(
+                                        1,
+                                        2,
+                                        field_index,
+                                        player_color.into(),
+                                    )
+                                }
+                            }
+                            // Outer Ring
+                            2 if previous_rings_field_state == 0 => {
+                                moves_possible_counter += 1;
+
+                                moves_to_mill_counter += self.across_rings_get_mills_after_simulating_move(
+                                    2,
+                                    1,
+                                    field_index,
+                                    player_color.into(),
+                                )
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                // The opposite colors amount of stones which can be taken should be counted, which is if the stone
+                // Isn't inside a mill!
+                else if self.get_mill_count(
+                    ring_index,
+                    field_index,
+                    DirectionToCheck::OnAndAcrossRings((!player_color).into()),
+                ) == 0
+                {
+                    stones_to_take_counter += 1;
+                }
+            }
+        }
+
+        (moves_possible_counter, moves_to_mill_counter, stones_to_take_counter)
+    }
+
+    /// Simulates a move of the stones of the fields index on a given ring to it's neighbor index
+    /// Indices are already in representation form (0 <= x < 16).step_by(2)
+    // TODO merge this for code de-duplication
+    // TODO test if out-of-place performs better here
+    fn on_ring_get_mills_after_simulating_move(
+        &mut self,
+        ring_index: usize,
+        fields_index: u32,
+        fields_neighbor_index: u32,
+        color: u16,
+    ) -> u32 {
+        // To rollback the in-situ changes on self
+        let current_ring_state_backup = self.state[ring_index];
+
+        // Clear out the current index
+        self.state[ring_index] &= !(3u16 << fields_index);
+        // Set the empty neighbors value to the old one of the current index:
+        self.state[ring_index] |= color << fields_neighbor_index;
+
+        // Check for mills after the move now has taken place
+        let mills_possible = self.get_mill_count(
+            ring_index,
+            fields_neighbor_index,
+            DirectionToCheck::OnAndAcrossRings(color),
+        );
+
+        // Resetting the in-place simulation
+        self.state[ring_index] = current_ring_state_backup;
+
+        return mills_possible;
+    }
+
+    /// Same as [on_ring_get_mills_after_simulating_move], but in between two ring indices
+    fn across_rings_get_mills_after_simulating_move(
+        &mut self,
+        start_ring_index: usize,
+        target_ring_index: usize,
+        fields_index: u32,
+        color: u16,
+    ) -> u32 {
+        // To rollback the in-situ changes on self
+        let start_ring_state_backup = self.state[start_ring_index];
+        let target_ring_state_backup = self.state[target_ring_index];
+
+        // Clear out the current index
+        self.state[start_ring_index] &= !(3u16 << fields_index);
+        // Set the empty neighbors value to the old one of the current index:
+        self.state[target_ring_index] |= color << fields_index;
+
+        // Check for mills after the move now has taken place
+        let mills_possible = self.get_mill_count(target_ring_index, fields_index, DirectionToCheck::OnRing);
+
+        // Resetting the in-place simulation
+        self.state[start_ring_index] = start_ring_state_backup;
+        self.state[target_ring_index] = target_ring_state_backup;
+
+        return mills_possible;
+    }
+
+    /// Checks for mills on the specified field & returns it.
+    /// The check for mills across rings are toggled when the right argument is set. The tuple enum is there to avoid
+    /// the re-calculation of the field state of the current index which should be determined on call-time
+    ///
+    /// Preconditions:
+    /// - The field state of the current index must be not null
+    /// - The fields index must be (0..16).step_by(2) and the ring index 0..3
+    fn get_mill_count(&self, ring_index: usize, field_index: u32, direction: DirectionToCheck) -> u32 {
+        assert!(field_index < 16);
+        assert!(ring_index < 3);
+
+        let mut mill_counter = 0;
+
+        /* Rotations of the real play field anti-clockwise per index for alignment on the index 0:
+        0,1 => 7
+        1 => 1
+        2,3 => 1
+        3 => 3
+        4,5 => 3
+        5 => 5
+        6,7 => 5
+        7 => 7
+        */
+        match field_index {
+            0 | 4 | 8 | 12 => {
+                let triple_state =
+                    self.state[ring_index].rotate_right((field_index + 14/* = -2 */) % 16) & 0b00000000_00111111u16;
+                /* 010101 | 101010 */
+                if triple_state == 21u16 || triple_state == 42u16 {
+                    mill_counter += 1;
+                }
+            }
+            2 | 6 | 10 | 14 => {
+                let first_triple_state =
+                    self.state[ring_index].rotate_right((field_index + 12/* = -4 */) % 16) & 0b00000000_00111111u16;
+                /* 010101 | 101010 */
+                if first_triple_state == 21u16 || first_triple_state == 42u16 {
+                    mill_counter += 1;
+                }
+
+                let second_triple_state = self.state[ring_index].rotate_right(field_index) & 0b00000000_00111111u16;
+                /* 010101 | 101010 */
+                if second_triple_state == 21u16 || second_triple_state == 42u16 {
+                    mill_counter += 1;
+                }
+            }
+            _ => panic!(),
+        }
+
+        // Argument field index in the middle of a triple and therefore can form a mill connected to the other rings
+        if let DirectionToCheck::OnAndAcrossRings(color) = direction {
+            assert!(color < 3);
+
+            /* && indexs_field_state != 0 */
+            if ring_index % 4 == 0 {
+                assert!(((self.state[ring_index] >> field_index) & 3u16) != 0);
+
+                let next_indexs_field_state = self.state[(ring_index + 1) % 3] >> field_index;
+                let next_next_indexs_field_state = self.state[(ring_index + 2) % 3] >> field_index;
+
+                // Mill in between rings:
+                if next_indexs_field_state == color && next_indexs_field_state == next_next_indexs_field_state {
+                    mill_counter += 1;
+                }
+            }
+        }
+
+        mill_counter
+    }
 }
 
-pub fn process_input_felder_txt() {
+pub enum ToWhatToProcess {
+    CanonicalForm,
+    MoveTripel,
+}
+
+enum DirectionToCheck {
+    OnRing,
+    OnAndAcrossRings(u16),
+}
+
+// TODO enum this!
+pub fn process_input_felder(outputs_contents: ToWhatToProcess) {
     let input_felder_txt =
         File::open("input_felder.txt").expect("The 'input_felder.txt' file was not found in the projects root...");
     let reader = BufReader::new(input_felder_txt);
@@ -194,26 +433,37 @@ pub fn process_input_felder_txt() {
     let output_text = File::create("output.txt").expect("Could not create ro 'output.txt' to write results into");
     let mut writer = BufWriter::new(output_text);
 
-    let mut h_map: HashMap<EfficientPlayField, usize> = HashMap::new();
+    if let ToWhatToProcess::CanonicalForm = outputs_contents {
+        let mut h_map: HashMap<EfficientPlayField, usize> = HashMap::new();
 
-    for (line_index, line_content) in reader.lines().enumerate() {
-        // Idk why but the reference output.txt starts counting on 1...
-        let line_index = line_index + 1;
+        for (line_index, line_content) in reader.lines().enumerate() {
+            // Idk why but the reference output.txt starts counting on 1...
+            let line_index = line_index + 1;
 
-        let mut test_playfield = EfficientPlayField::from_coded(&line_content.unwrap());
-        let canonical_form = test_playfield.get_canonical_form();
+            let mut playfield = EfficientPlayField::from_coded(&line_content.unwrap());
+            let canonical_form = playfield.get_canonical_form();
 
-        if let Some(previous_canoncial_match) = h_map.get(&canonical_form) {
-            writeln!(writer, "{}", previous_canoncial_match).unwrap();
+            if let Some(previous_canonical_match) = h_map.get(&canonical_form) {
+                writeln!(writer, "{}", previous_canonical_match).unwrap();
+            } else {
+                h_map.insert(canonical_form, line_index);
+                writeln!(writer, "{}", line_index).unwrap();
+            }
+        }
+    } else {
+        for line_content in reader.lines() {
+            let line_content = line_content.unwrap();
+            let mut playfield = EfficientPlayField::from_coded(&line_content);
 
-            /*writer
-            .write_fmt(format_args!("{}\n", previous_canoncial_match))
-            .unwrap(); */
-        } else {
-            h_map.insert(canonical_form, line_index);
-            writeln!(writer, "{}", line_index).unwrap();
+            let (x, y, z) = playfield.get_move_triple(PlayerColor::White);
 
-            //writer.write_fmt(format_args!("{}\n", line_index)).unwrap();
+            assert!({
+                println!("Input:{}\n{playfield}", line_content);
+                println!("Moves: {x}\nMoves->Mill: {y}\nTo Take: {z}");
+                true
+            });
+
+            writeln!(writer, "{x} {y} {z}").unwrap();
         }
     }
 }
@@ -223,8 +473,13 @@ mod tests {
     use super::EfficientPlayField;
 
     #[test]
-    fn assignment() {
-        super::process_input_felder_txt();
+    fn assignment4() {
+        super::process_input_felder(super::ToWhatToProcess::CanonicalForm);
+    }
+
+    #[test]
+    fn assignment5() {
+        super::process_input_felder(super::ToWhatToProcess::MoveTripel);
     }
 
     mod normal {
