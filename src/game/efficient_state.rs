@@ -367,31 +367,21 @@ impl EfficientPlayField {
         7 => 7
         */
         let indices_to_rotate = (field_index - (field_index % 4) + 14) % 16;
+        // Field state triple containing field_index:
+        let state_triple = self.state[ring_index].rotate_right(indices_to_rotate) & 0b00000000_00111111u16;
 
-        match field_index {
-            0 | 4 | 8 | 12 => {
-                let triple_state =
-                    self.state[ring_index].rotate_right(indices_to_rotate) & 0b00000000_00111111u16;
-                /* 010101 | 101010 */
-                if triple_state == 21u16 || triple_state == 42u16 {
-                    mill_counter += 1;
-                }
-            }
-            2 | 6 | 10 | 14 => {
-                let first_triple_state =
-                    self.state[ring_index].rotate_right(indices_to_rotate) & 0b00000000_00111111u16;
-                /* 010101 | 101010 */
-                if first_triple_state == 21u16 || first_triple_state == 42u16 {
-                    mill_counter += 1;
-                }
+        /* 010101 | 101010 */
+        if state_triple == 21u16 || state_triple == 42u16 {
+            mill_counter += 1;
+        }
 
-                let second_triple_state = self.state[ring_index].rotate_right(field_index) & 0b00000000_00111111u16;
-                /* 010101 | 101010 */
-                if second_triple_state == 21u16 || second_triple_state == 42u16 {
-                    mill_counter += 1;
-                }
+        // If index is located in an edge, two triples must be checked for mill occurrence
+        if field_index == 2 | 6 | 10 | 14 {
+            let state_triple = self.state[ring_index].rotate_right(field_index) & 0b00000000_00111111u16;
+            /* 010101 | 101010 */
+            if state_triple == 21u16 || state_triple == 42u16 {
+                mill_counter += 1;
             }
-            _ => {/* panic!() - removed for performance reasons */},
         }
 
         // Argument field index in the middle of a triple and therefore can form a mill connected to the other rings
