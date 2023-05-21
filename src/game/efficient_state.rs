@@ -206,7 +206,9 @@ impl EfficientPlayField {
                             moves_to_mill_counter += self.simulating_move_then_get_mills(
                                 ring_index,
                                 field_index,
-                                MoveDirection::OnRing { target_field_index: neighbor_index },
+                                MoveDirection::OnRing {
+                                    target_field_index: neighbor_index,
+                                },
                                 current_field_state,
                             );
                         }
@@ -273,7 +275,9 @@ impl EfficientPlayField {
                 else if self.get_mill_count(
                     ring_index,
                     field_index,
-                    DirectionToCheck::OnAndAcrossRings { player_color: current_field_state },
+                    DirectionToCheck::OnAndAcrossRings {
+                        player_color: current_field_state,
+                    },
                 ) == 0
                 {
                     stones_to_take_counter += 1;
@@ -304,8 +308,7 @@ impl EfficientPlayField {
         // Clear out the current index, must be done when simulating the moving in general
         self.state[start_ring_index] &= !(3u16 << start_fields_index);
 
-        let mills_possible =
-        if let MoveDirection::AcrossRings { target_ring_index } = direction {
+        let mills_possible = if let MoveDirection::AcrossRings { target_ring_index } = direction {
             // To rollback the second in-situ changes on self
             let target_ring_backup = self.state[target_ring_index];
 
@@ -318,8 +321,7 @@ impl EfficientPlayField {
             self.state[target_ring_index] = target_ring_backup;
 
             mills_possible
-        }
-        else if let MoveDirection::OnRing { target_field_index } = direction {
+        } else if let MoveDirection::OnRing { target_field_index } = direction {
             // Set the empty neighbors value to the old one of the current index:
             self.state[start_ring_index] |= color << target_field_index;
 
@@ -329,11 +331,12 @@ impl EfficientPlayField {
                 target_field_index,
                 DirectionToCheck::OnAndAcrossRings { player_color: color },
             )
-        } else {0};
+        } else {
+            0
+        };
 
         // Resetting the in-place simulation
         self.state[start_ring_index] = start_ring_backup;
-
 
         return mills_possible;
     }
@@ -400,16 +403,15 @@ impl EfficientPlayField {
     }
 }
 
-
 enum MoveDirection {
-    OnRing{target_field_index: u32},
-    AcrossRings{target_ring_index: usize},
+    OnRing { target_field_index: u32 },
+    AcrossRings { target_ring_index: usize },
 }
 
 /// Used by the [get_mill_count] method of [EfficientPlayField]
 enum DirectionToCheck {
     OnRing,
-    OnAndAcrossRings{player_color: u16},
+    OnAndAcrossRings { player_color: u16 },
 }
 
 /// Used by the [process_input_felder] method

@@ -13,7 +13,7 @@ fn make_playfield_random(pf: &mut EfficientPlayField) {
                 1 => 1,
                 2 => 2,
                 0 | 3 | 4 | 5 => continue,
-                _ => panic!()
+                _ => panic!(),
             };
 
             pf.set_field(i, j, randome_number);
