@@ -203,10 +203,10 @@ impl EfficientPlayField {
                         if (self.state[ring_index] & (3u16 << neighbor_index)) == 0 {
                             moves_possible_counter += 1;
 
-                            moves_to_mill_counter += self.on_ring_get_mills_after_simulating_move(
+                            moves_to_mill_counter += self.simulating_move_then_get_mills(
                                 ring_index,
                                 field_index,
-                                neighbor_index,
+                                MoveDirection::OnRing { target_field_index: neighbor_index },
                                 current_field_state,
                             );
                         }
@@ -222,10 +222,10 @@ impl EfficientPlayField {
                             0 if next_rings_field_state == 0 => {
                                 moves_possible_counter += 1;
 
-                                moves_to_mill_counter += self.across_rings_get_mills_after_simulating_move(
+                                moves_to_mill_counter += self.simulating_move_then_get_mills(
                                     0,
-                                    1,
                                     field_index,
+                                    MoveDirection::AcrossRings { target_ring_index: 1 },
                                     current_field_state,
                                 )
                             }
@@ -234,10 +234,10 @@ impl EfficientPlayField {
                                 if previous_rings_field_state == 0 {
                                     moves_possible_counter += 1;
 
-                                    moves_to_mill_counter += self.across_rings_get_mills_after_simulating_move(
+                                    moves_to_mill_counter += self.simulating_move_then_get_mills(
                                         1,
-                                        0,
                                         field_index,
+                                        MoveDirection::AcrossRings { target_ring_index: 0 },
                                         current_field_state,
                                     )
                                 }
@@ -245,10 +245,10 @@ impl EfficientPlayField {
                                 if next_rings_field_state == 0 {
                                     moves_possible_counter += 1;
 
-                                    moves_to_mill_counter += self.across_rings_get_mills_after_simulating_move(
+                                    moves_to_mill_counter += self.simulating_move_then_get_mills(
                                         1,
-                                        2,
                                         field_index,
+                                        MoveDirection::AcrossRings { target_ring_index: 2 },
                                         current_field_state,
                                     )
                                 }
@@ -257,10 +257,10 @@ impl EfficientPlayField {
                             2 if previous_rings_field_state == 0 => {
                                 moves_possible_counter += 1;
 
-                                moves_to_mill_counter += self.across_rings_get_mills_after_simulating_move(
+                                moves_to_mill_counter += self.simulating_move_then_get_mills(
                                     2,
-                                    1,
                                     field_index,
+                                    MoveDirection::AcrossRings { target_ring_index: 1 },
                                     current_field_state,
                                 )
                             }
@@ -273,7 +273,7 @@ impl EfficientPlayField {
                 else if self.get_mill_count(
                     ring_index,
                     field_index,
-                    DirectionToCheck::OnAndAcrossRings(current_field_state),
+                    DirectionToCheck::OnAndAcrossRings { player_color: current_field_state },
                 ) == 0
                 {
                     stones_to_take_counter += 1;
@@ -284,61 +284,56 @@ impl EfficientPlayField {
         (moves_possible_counter, moves_to_mill_counter, stones_to_take_counter)
     }
 
-    /// Simulates a move of the stones of the fields index on a given ring to it's neighbor index
-    /// Indices are already in representation form (0 <= x < 16).step_by(2)
-    // TODO merge this for code de-duplication
+    /// Simulates a move of the stones of the start fields and ring index to either a it's neighboring target index or
+    /// the start index on another ring, which is determined by the [MoveDirection] enum.
+    ///
+    /// Preconditions:
+    /// - Indices should already be in "representation form" (= 0 <= x < 16).step_by(2)
+    /// - The target field/ the start index on the other ring must be empty
     // TODO test if out-of-place performs better here
-    fn on_ring_get_mills_after_simulating_move(
-        &mut self,
-        ring_index: usize,
-        fields_index: u32,
-        fields_neighbor_index: u32,
-        color: u16,
-    ) -> u32 {
-        // To rollback the in-situ changes on self
-        let current_ring_state_backup = self.state[ring_index];
-
-        // Clear out the current index
-        self.state[ring_index] &= !(3u16 << fields_index);
-        // Set the empty neighbors value to the old one of the current index:
-        self.state[ring_index] |= color << fields_neighbor_index;
-
-        // Check for mills after the move now has taken place
-        let mills_possible = self.get_mill_count(
-            ring_index,
-            fields_neighbor_index,
-            DirectionToCheck::OnAndAcrossRings(color),
-        );
-
-        // Resetting the in-place simulation
-        self.state[ring_index] = current_ring_state_backup;
-
-        return mills_possible;
-    }
-
-    /// Same as [on_ring_get_mills_after_simulating_move], but in between two ring indices
-    fn across_rings_get_mills_after_simulating_move(
+    fn simulating_move_then_get_mills(
         &mut self,
         start_ring_index: usize,
-        target_ring_index: usize,
-        fields_index: u32,
+        start_fields_index: u32,
+        direction: MoveDirection,
         color: u16,
     ) -> u32 {
         // To rollback the in-situ changes on self
-        let start_ring_state_backup = self.state[start_ring_index];
-        let target_ring_state_backup = self.state[target_ring_index];
+        let start_ring_backup = self.state[start_ring_index];
 
-        // Clear out the current index
-        self.state[start_ring_index] &= !(3u16 << fields_index);
-        // Set the empty neighbors value to the old one of the current index:
-        self.state[target_ring_index] |= color << fields_index;
+        // Clear out the current index, must be done when simulating the moving in general
+        self.state[start_ring_index] &= !(3u16 << start_fields_index);
 
-        // Check for mills after the move now has taken place
-        let mills_possible = self.get_mill_count(target_ring_index, fields_index, DirectionToCheck::OnRing);
+        let mills_possible =
+        if let MoveDirection::AcrossRings { target_ring_index } = direction {
+            // To rollback the second in-situ changes on self
+            let target_ring_backup = self.state[target_ring_index];
+
+            // Setting the state of the other index, which must be empty
+            self.state[target_ring_index] |= color << start_fields_index;
+
+            let mills_possible = self.get_mill_count(target_ring_index, start_fields_index, DirectionToCheck::OnRing);
+
+            // Resetting the in-place simulation on the other ring
+            self.state[target_ring_index] = target_ring_backup;
+
+            mills_possible
+        }
+        else if let MoveDirection::OnRing { target_field_index } = direction {
+            // Set the empty neighbors value to the old one of the current index:
+            self.state[start_ring_index] |= color << target_field_index;
+
+            // Check for mills after the move now has taken place
+            self.get_mill_count(
+                start_ring_index,
+                target_field_index,
+                DirectionToCheck::OnAndAcrossRings { player_color: color },
+            )
+        } else {0};
 
         // Resetting the in-place simulation
-        self.state[start_ring_index] = start_ring_state_backup;
-        self.state[target_ring_index] = target_ring_state_backup;
+        self.state[start_ring_index] = start_ring_backup;
+
 
         return mills_possible;
     }
@@ -385,7 +380,7 @@ impl EfficientPlayField {
         }
 
         // Argument field index in the middle of a triple and therefore can form a mill connected to the other rings
-        if let DirectionToCheck::OnAndAcrossRings(color) = direction {
+        if let DirectionToCheck::OnAndAcrossRings { player_color } = direction {
             //assert!(color < 3);
 
             if ring_index % 4 == 0 {
@@ -395,7 +390,7 @@ impl EfficientPlayField {
                 let next_next_indexs_field_state = self.state[(ring_index + 2) % 3] >> field_index;
 
                 // Mill in between rings:
-                if next_indexs_field_state == color && next_indexs_field_state == next_next_indexs_field_state {
+                if next_indexs_field_state == player_color && next_indexs_field_state == next_next_indexs_field_state {
                     mill_counter += 1;
                 }
             }
@@ -405,17 +400,24 @@ impl EfficientPlayField {
     }
 }
 
+
+enum MoveDirection {
+    OnRing{target_field_index: u32},
+    AcrossRings{target_ring_index: usize},
+}
+
+/// Used by the [get_mill_count] method of [EfficientPlayField]
+enum DirectionToCheck {
+    OnRing,
+    OnAndAcrossRings{player_color: u16},
+}
+
+/// Used by the [process_input_felder] method
 pub enum ToWhatToProcess {
     CanonicalForm,
     MoveTripel,
 }
 
-enum DirectionToCheck {
-    OnRing,
-    OnAndAcrossRings(u16),
-}
-
-// TODO enum this!
 pub fn process_input_felder(outputs_contents: ToWhatToProcess) {
     let input_felder_txt =
         File::open("input_felder.txt").expect("The 'input_felder.txt' file was not found in the projects root...");
