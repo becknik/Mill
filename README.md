@@ -25,7 +25,7 @@ Execution:
 
 ```bash
 cd Mill
-cargo test -- assignment
+cargo test -- assignment4
 diff output.txt ../blatt_4_test_data_large/output.txt
 ```
 
@@ -40,3 +40,12 @@ EBEEWBWWEBBEBEWBEWEWBEWE
 EEBEBWWEWEWWEEEEEEEBBBEE
 
 ```
+
+### Assignment 5
+
+```bash
+cd Mill
+cargo test -- assignment5 --show-output
+```
+
+Or do a `cargo bench` & take a look into the `perf-opti` branch to see my waste of time due two stupid bugs... :'(
