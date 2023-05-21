@@ -315,7 +315,9 @@ impl EfficientPlayField {
             // Setting the state of the other index, which must be empty
             self.state[target_ring_index] |= color << start_fields_index;
 
+			// TODO makes this sense to you, future me? :|
             let mills_possible = self.get_mill_count(target_ring_index, start_fields_index, DirectionToCheck::OnRing);
+            //let mills_possible = self.get_mill_count(target_ring_index, start_fields_index, DirectionToCheck::OnAndAcrossRings { player_color: color });
 
             // Resetting the in-place simulation on the other ring
             self.state[target_ring_index] = target_ring_backup;
@@ -386,11 +388,11 @@ impl EfficientPlayField {
         if let DirectionToCheck::OnAndAcrossRings { player_color } = direction {
             //assert!(color < 3);
 
-            if ring_index % 4 == 0 {
+            if field_index % 4 == 0 {
                 //assert!(((self.state[ring_index] >> field_index) & 3u16) != 0);
 
-                let next_indexs_field_state = self.state[(ring_index + 1) % 3] >> field_index;
-                let next_next_indexs_field_state = self.state[(ring_index + 2) % 3] >> field_index;
+                let next_indexs_field_state = (self.state[(ring_index + 1) % 3] & (3u16 << field_index)) >> field_index;
+                let next_next_indexs_field_state = (self.state[(ring_index + 2) % 3] & (3u16 << field_index)) >> field_index;
 
                 // Mill in between rings:
                 if next_indexs_field_state == player_color && next_indexs_field_state == next_next_indexs_field_state {
@@ -447,14 +449,14 @@ pub fn process_input_felder(outputs_contents: ToWhatToProcess) {
             }
         }
     } else {
-        for line_content in reader.lines() {
+        for (line_index, line_content) in reader.lines().enumerate() {
             let line_content = line_content.unwrap();
             let mut playfield = EfficientPlayField::from_coded(&line_content);
 
             let (x, y, z) = playfield.get_move_triple(PlayerColor::White);
 
             assert!({
-                println!("Input:{}\n{playfield}", line_content);
+                println!("Input {line_index}: {line_content}\n{playfield}");
                 println!("Moves: {x}\nMoves->Mill: {y}\nTo Take: {z}");
                 true
             });
@@ -480,30 +482,8 @@ mod tests {
 
     #[test]
     fn assignment5_dbg() {
-        let mut test_epf = EfficientPlayField::from_coded("WBWEWEBWWEBBEEWEEEEBWBBB");
-        /*
-        Input:WBWEWEBWWEBBEEWEEEEBWBBB
+        let mut test_epf = EfficientPlayField::from_coded("BEEEWEWBEEWWEEWEWEEWWWBB");
 
-            7|  ●------------●------------○
-             |  |            |            |
-            6|  |   ·--------●--------·   |
-             |  |   |        |        |   |
-            5|  |   |   ○----·----·   |   |
-             |  |   |   |         |   |   |
-            4|  ○---●---○         ·---○---●
-             |  |   |   |         |   |   |
-            3|  |   |   ○----●----○   |   |
-             |  |   |        |        |   |
-            2|  |   ·--------·--------○   |
-             |  |            |            |
-            1|  ·------------●------------·
-               ____________________________
-                A   B   C    D    E   F   G
-
-            Ring 0: 1010100110000000
-            Ring 1: 0001000010100001
-            Ring 2: 0110000100011001
-        */
         test_epf.get_move_triple(crate::game::PlayerColor::White);
     }
 
