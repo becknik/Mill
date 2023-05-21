@@ -203,7 +203,7 @@ impl EfficientPlayField {
                         if (self.state[ring_index] & (3u16 << neighbor_index)) == 0 {
                             moves_possible_counter += 1;
 
-                            moves_to_mill_counter += self.simulating_move_then_get_mills(
+                            moves_to_mill_counter += self.simulate_move_then_get_mills(
                                 ring_index,
                                 field_index,
                                 MoveDirection::OnRing {
@@ -224,7 +224,7 @@ impl EfficientPlayField {
                             0 if next_rings_field_state == 0 => {
                                 moves_possible_counter += 1;
 
-                                moves_to_mill_counter += self.simulating_move_then_get_mills(
+                                moves_to_mill_counter += self.simulate_move_then_get_mills(
                                     0,
                                     field_index,
                                     MoveDirection::AcrossRings { target_ring_index: 1 },
@@ -236,7 +236,7 @@ impl EfficientPlayField {
                                 if previous_rings_field_state == 0 {
                                     moves_possible_counter += 1;
 
-                                    moves_to_mill_counter += self.simulating_move_then_get_mills(
+                                    moves_to_mill_counter += self.simulate_move_then_get_mills(
                                         1,
                                         field_index,
                                         MoveDirection::AcrossRings { target_ring_index: 0 },
@@ -247,7 +247,7 @@ impl EfficientPlayField {
                                 if next_rings_field_state == 0 {
                                     moves_possible_counter += 1;
 
-                                    moves_to_mill_counter += self.simulating_move_then_get_mills(
+                                    moves_to_mill_counter += self.simulate_move_then_get_mills(
                                         1,
                                         field_index,
                                         MoveDirection::AcrossRings { target_ring_index: 2 },
@@ -259,7 +259,7 @@ impl EfficientPlayField {
                             2 if previous_rings_field_state == 0 => {
                                 moves_possible_counter += 1;
 
-                                moves_to_mill_counter += self.simulating_move_then_get_mills(
+                                moves_to_mill_counter += self.simulate_move_then_get_mills(
                                     2,
                                     field_index,
                                     MoveDirection::AcrossRings { target_ring_index: 1 },
@@ -295,7 +295,7 @@ impl EfficientPlayField {
     /// - Indices should already be in "representation form" (= 0 <= x < 16).step_by(2)
     /// - The target field/ the start index on the other ring must be empty
     // TODO test if out-of-place performs better here
-    fn simulating_move_then_get_mills(
+    fn simulate_move_then_get_mills(
         &mut self,
         start_ring_index: usize,
         start_fields_index: u32,
@@ -403,6 +403,7 @@ impl EfficientPlayField {
     }
 }
 
+/// Used by the [simulate_move_then_get_mills] method of [EfficientPlayField]
 enum MoveDirection {
     OnRing { target_field_index: u32 },
     AcrossRings { target_ring_index: usize },
@@ -480,29 +481,29 @@ mod tests {
     #[test]
     fn assignment5_dbg() {
         let mut test_epf = EfficientPlayField::from_coded("WBWEWEBWWEBBEEWEEEEBWBBB");
-/*
-Input:WBWEWEBWWEBBEEWEEEEBWBBB
+        /*
+        Input:WBWEWEBWWEBBEEWEEEEBWBBB
 
-	7|  ●------------●------------○
-	 |  |            |            |
-	6|  |   ·--------●--------·   |
-	 |  |   |        |        |   |
-	5|  |   |   ○----·----·   |   |
-	 |  |   |   |         |   |   |
-	4|  ○---●---○         ·---○---●
-	 |  |   |   |         |   |   |
-	3|  |   |   ○----●----○   |   |
-	 |  |   |        |        |   |
-	2|  |   ·--------·--------○   |
-	 |  |            |            |
-	1|  ·------------●------------·
-	   ____________________________
-	    A   B   C    D    E   F   G
+            7|  ●------------●------------○
+             |  |            |            |
+            6|  |   ·--------●--------·   |
+             |  |   |        |        |   |
+            5|  |   |   ○----·----·   |   |
+             |  |   |   |         |   |   |
+            4|  ○---●---○         ·---○---●
+             |  |   |   |         |   |   |
+            3|  |   |   ○----●----○   |   |
+             |  |   |        |        |   |
+            2|  |   ·--------·--------○   |
+             |  |            |            |
+            1|  ·------------●------------·
+               ____________________________
+                A   B   C    D    E   F   G
 
-	Ring 0: 1010100110000000
-	Ring 1: 0001000010100001
-	Ring 2: 0110000100011001
-*/
+            Ring 0: 1010100110000000
+            Ring 1: 0001000010100001
+            Ring 2: 0110000100011001
+        */
         test_epf.get_move_triple(crate::game::PlayerColor::White);
     }
 
