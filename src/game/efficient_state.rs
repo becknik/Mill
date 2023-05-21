@@ -374,7 +374,7 @@ impl EfficientPlayField {
         }
 
         // If index is located in an edge, two triples must be checked for mill occurrence
-        if field_index == 2 | 6 | 10 | 14 {
+        if field_index == 2 || field_index == 6 || field_index == 10 || field_index == 14 {
             let state_triple = self.state[ring_index].rotate_right(field_index) & 0b00000000_00111111u16;
             /* 010101 | 101010 */
             if state_triple == 21u16 || state_triple == 42u16 {
@@ -475,6 +475,35 @@ mod tests {
     #[test]
     fn assignment5() {
         super::process_input_felder(super::ToWhatToProcess::MoveTripel);
+    }
+
+    #[test]
+    fn assignment5_dbg() {
+        let mut test_epf = EfficientPlayField::from_coded("WBWEWEBWWEBBEEWEEEEBWBBB");
+/*
+Input:WBWEWEBWWEBBEEWEEEEBWBBB
+
+	7|  ●------------●------------○
+	 |  |            |            |
+	6|  |   ·--------●--------·   |
+	 |  |   |        |        |   |
+	5|  |   |   ○----·----·   |   |
+	 |  |   |   |         |   |   |
+	4|  ○---●---○         ·---○---●
+	 |  |   |   |         |   |   |
+	3|  |   |   ○----●----○   |   |
+	 |  |   |        |        |   |
+	2|  |   ·--------·--------○   |
+	 |  |            |            |
+	1|  ·------------●------------·
+	   ____________________________
+	    A   B   C    D    E   F   G
+
+	Ring 0: 1010100110000000
+	Ring 1: 0001000010100001
+	Ring 2: 0110000100011001
+*/
+        test_epf.get_move_triple(crate::game::PlayerColor::White);
     }
 
     mod normal {
