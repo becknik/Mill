@@ -13,6 +13,7 @@ use super::{state, PlayerColor};
 
 mod de_encode;
 mod printing;
+mod win_decider;
 
 /// Efficient representation of [PlayField] using a [u16; 3] for it's internal representation.
 /// Start counting from the top middle mill field on the LSB of each u16 field for each of the 3 rectangle rings
@@ -206,7 +207,7 @@ impl EfficientPlayField {
                         if (self.state[ring_index] & (3u16 << neighbor_index)) == 0 {
                             moves_possible_counter += 1;
 
-                            moves_to_mill_counter += self.simulate_move_then_get_mills(
+                            moves_to_mill_counter += self.simulate_move_get_mill_count(
                                 ring_index,
                                 field_index,
                                 MoveDirection::OnRing {
@@ -227,7 +228,7 @@ impl EfficientPlayField {
                             0 if next_rings_field_state == 0 => {
                                 moves_possible_counter += 1;
 
-                                moves_to_mill_counter += self.simulate_move_then_get_mills(
+                                moves_to_mill_counter += self.simulate_move_get_mill_count(
                                     0,
                                     field_index,
                                     MoveDirection::AcrossRings { target_ring_index: 1 },
@@ -239,7 +240,7 @@ impl EfficientPlayField {
                                 if previous_rings_field_state == 0 {
                                     moves_possible_counter += 1;
 
-                                    moves_to_mill_counter += self.simulate_move_then_get_mills(
+                                    moves_to_mill_counter += self.simulate_move_get_mill_count(
                                         1,
                                         field_index,
                                         MoveDirection::AcrossRings { target_ring_index: 0 },
@@ -250,7 +251,7 @@ impl EfficientPlayField {
                                 if next_rings_field_state == 0 {
                                     moves_possible_counter += 1;
 
-                                    moves_to_mill_counter += self.simulate_move_then_get_mills(
+                                    moves_to_mill_counter += self.simulate_move_get_mill_count(
                                         1,
                                         field_index,
                                         MoveDirection::AcrossRings { target_ring_index: 2 },
@@ -262,7 +263,7 @@ impl EfficientPlayField {
                             2 if previous_rings_field_state == 0 => {
                                 moves_possible_counter += 1;
 
-                                moves_to_mill_counter += self.simulate_move_then_get_mills(
+                                moves_to_mill_counter += self.simulate_move_get_mill_count(
                                     2,
                                     field_index,
                                     MoveDirection::AcrossRings { target_ring_index: 1 },
@@ -307,7 +308,7 @@ impl EfficientPlayField {
     /// - Indices should already be in "representation form" (= 0 <= x < 16).step_by(2)
     /// - The target field/ the start index on the other ring must be empty
     // TODO test if out-of-place performs better here
-    fn simulate_move_then_get_mills(
+    fn simulate_move_get_mill_count(
         &mut self,
         start_ring_index: usize,
         start_fields_index: u32,
