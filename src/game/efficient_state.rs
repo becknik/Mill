@@ -199,7 +199,7 @@ impl EfficientPlayField {
                 }
 
                 // In this branch the current colors possible moves & => movements into a mill should be figured out
-                if current_field_state == player_color.into() {
+                if current_field_state == <PlayerColor as Into<u16>>::into(player_color) {
                     let ring_neighbors_indices = [(field_index + 14) % 16, (field_index + 18) % 16];
 
                     for neighbor_index in ring_neighbors_indices {
@@ -311,7 +311,7 @@ impl EfficientPlayField {
     fn simulate_move_get_mill_count(
         &mut self,
         start_ring_index: usize,
-        start_fields_index: u32,
+        start_fields_index: u16,
         direction: MoveDirection,
         color: u16,
     ) -> u32 {
@@ -363,7 +363,7 @@ impl EfficientPlayField {
     /// Preconditions:
     /// - The field state of the current index must be not null
     /// - The fields index must be (0..16).step_by(2) and the ring index 0..3
-    fn get_mill_count(&self, ring_index: usize, field_index: u32, direction: DirectionToCheck) -> u32 {
+    fn get_mill_count(&self, ring_index: usize, field_index: u16, direction: DirectionToCheck) -> u32 {
         //assert!(field_index < 16);
         //assert!(ring_index < 3);
 
@@ -379,7 +379,7 @@ impl EfficientPlayField {
         6,7 => 5
         7 => 7
         */
-        let indices_to_rotate = (field_index - (field_index % 4) + 14) % 16;
+        let indices_to_rotate = ((field_index - (field_index % 4) + 14) % 16) as u32;
         // Field state triple containing field_index:
         let state_triple = self.state[ring_index].rotate_right(indices_to_rotate) & 0b0000_0000_0011_1111u16;
 
@@ -390,7 +390,7 @@ impl EfficientPlayField {
 
         // If index is located in an edge, two triples must be checked for mill occurrence
         if field_index == 2 || field_index == 6 || field_index == 10 || field_index == 14 {
-            let state_triple = self.state[ring_index].rotate_right(field_index) & 0b000_00000_0011_1111u16;
+            let state_triple = self.state[ring_index].rotate_right(field_index as u32) & 0b000_00000_0011_1111u16;
             /* 010101 | 101010 */
             if state_triple == 21u16 || state_triple == 42u16 {
                 mill_counter += 1;
@@ -421,7 +421,7 @@ impl EfficientPlayField {
 
 /// Used by the [simulate_move_then_get_mills] method of [EfficientPlayField]
 enum MoveDirection {
-    OnRing { target_field_index: u32 },
+    OnRing { target_field_index: u16 },
     AcrossRings { target_ring_index: usize },
 }
 
