@@ -1,3 +1,7 @@
+use std::collections::HashSet;
+use std::hash::Hash;
+use std::thread::current;
+
 use super::DirectionToCheck;
 use super::EfficientPlayField;
 use super::MoveDirection;
@@ -410,5 +414,299 @@ impl EfficientPlayField {
             }
         }
         output_playfields
+    }
+
+    fn generate_permutations(prefix: u16, s_count: usize, w_count: usize, permutations: &mut Vec<u16>) {
+        if s_count == 0 && w_count == 0 {
+            permutations.push(prefix);
+            return;
+        }
+
+        if s_count > 0 {
+            let new_prefix = (prefix << 2) | 0x0002;
+            Self::generate_permutations(new_prefix, s_count - 1, w_count, permutations);
+        }
+
+        if w_count > 0 {
+            let new_prefix = (prefix << 2) | 0x0001;
+            Self::generate_permutations(new_prefix, s_count, w_count - 1, permutations);
+        }
+    }
+
+    fn generate_muehle_placement_playfields() -> Vec<EfficientPlayField> {
+        let mut muehle_placement_playfield = Vec::<EfficientPlayField>::new();
+
+        let mut template_1 = EfficientPlayField::default();
+        template_1.set_field(2, 7, 1);
+        template_1.set_field(2, 0, 1);
+        template_1.set_field(0, 1, 1);
+        muehle_placement_playfield.push(template_1);
+
+        let mut template_2 = EfficientPlayField::default();
+        template_2.set_field(1, 7, 1);
+        template_2.set_field(1, 0, 1);
+        template_2.set_field(1, 1, 1);
+        muehle_placement_playfield.push(template_2);
+
+        let mut template_3 = EfficientPlayField::default();
+        template_3.set_field(2, 0, 1);
+        template_3.set_field(1, 0, 1);
+        template_3.set_field(0, 0, 1);
+        muehle_placement_playfield.push(template_3);
+
+        muehle_placement_playfield
+    }
+
+    /* fn old_generate_ended_game_plafields() -> HashSet<EfficientPlayField> {
+           let mut won_plafields = HashSet::<EfficientPlayField>::new();
+
+           //generate the initial won/lost playfields
+           let mut permutations = Vec::<u16>::new();
+
+           for w_count in 0..=6 {
+               let s_count = 2;
+               Self::generate_permutations(0, s_count, w_count, &mut permutations);
+           }
+
+           //all possible placements of the muehle
+           let muehle_placement_playfields = Self::generate_muehle_placement_playfields();
+
+           let mut template_counter = 0;
+           for template_field in muehle_placement_playfields {
+               template_counter += 1;
+
+               for permutation in permutations {
+
+                   let mut current_permutation = permutation;
+                   let mut current_playfield = template_field;
+
+                   //insert current permutation into the template field
+                   for ring_index in 0..3 {
+                       for field_index in 0..8 {
+
+                           if current_permutation == 0 {
+                               break; //kann ich auch aus beiden for schleifen raus breaken
+                           }
+                           current_permutation = current_permutation >> 2;
+
+                           let current_element = 0x0003 & permutation;
+                           let current_field_state = template_field.state[ring_index] & (0x0003 << (field_index*2));
+
+                           if current_field_state != 0 {
+                               continue;
+                           }
+
+                           current_playfield.state[ring_index] &= current_element << (field_index*2);
+                       }
+                   }
+
+                   //shift permutation through playfield and insert each resulting playfield into output hashset
+
+
+
+               }
+           }
+           won_plafields
+       }
+    */
+    fn generate_playfields_rekursive(
+        &mut self,
+        mut ring_index: usize,
+        mut field_index: u16,
+        s_count: usize,
+        w_count: usize,
+        e_count: usize,
+        playfields: &mut HashSet<EfficientPlayField>,
+    ) {
+        if (s_count == 0 && w_count == 0) && e_count == 0 {
+            playfields.insert(self.clone());
+            return;
+        }
+
+        if field_index == 8 {
+            field_index = 0;
+            ring_index += 1;
+        }
+
+        if self.state[ring_index] & (0x0003 << (field_index * 2)) != 0 {
+            self.clone().generate_playfields_rekursive(
+                ring_index,
+                field_index + 1,
+                s_count,
+                w_count,
+                e_count,
+                playfields,
+            )
+        }
+
+        if e_count > 0 {
+            self.clone().generate_playfields_rekursive(
+                ring_index,
+                field_index + 1,
+                s_count,
+                w_count,
+                e_count - 1,
+                playfields,
+            )
+        }
+
+        if s_count > 0 {
+            let mut clone = self.clone();
+            clone.state[ring_index] &= 0x0002 << (field_index * 2);
+            clone.generate_playfields_rekursive(ring_index, field_index + 1, s_count - 1, w_count, e_count, playfields)
+        }
+
+        if w_count > 0 {
+            let mut clone = self.clone();
+            clone.state[ring_index] &= 0x0001 << (field_index * 2);
+            clone.generate_playfields_rekursive(ring_index, field_index + 1, s_count, w_count - 1, e_count, playfields)
+        }
+    }
+
+    pub fn generate_ended_game_plafields() -> HashSet<EfficientPlayField> {
+        let mut won_plafields = HashSet::<EfficientPlayField>::new();
+
+        for w_count in 0..=6 {
+            let s_count = 2;
+            let e_count = 19 - w_count;
+            let ring_index = 0;
+            let field_index = 0;
+
+            //all possible placements of the muehle
+            let muehle_placement_playfields = Self::generate_muehle_placement_playfields();
+
+            for mut template_field in muehle_placement_playfields {
+                template_field.generate_playfields_rekursive(
+                    ring_index,
+                    field_index,
+                    s_count,
+                    w_count,
+                    e_count,
+                    &mut won_plafields,
+                )
+            }
+        }
+
+        won_plafields
+    }
+
+    fn as_string(input: u16) -> String {
+        let bit_picker: u16 = 0b1100_0000_0000_0000;
+        let mut output_string = String::new();
+
+        for i in 0..8 {
+            let current_element = (input & (bit_picker >> (2 * i))) >> (14 - (2 * i));
+            match current_element {
+                0x0000 => (),
+                0x0001 => output_string.push('W'),
+                0x0002 => output_string.push('B'),
+                _ => panic!(),
+            }
+        }
+        output_string
+    }
+
+    pub fn invert_playfields_stone_colors(&self) -> EfficientPlayField {
+        let mut current_playfield = self.clone();
+
+        for ring_index in 0..3 {
+            for field_index in 0..8 {
+                match (current_playfield.state[ring_index] & (0x0003 << (field_index * 2))) >> (field_index * 2) {
+                    0x0000 => (),
+                    0x0001 => {
+                        current_playfield.state[ring_index] = (current_playfield.state[ring_index]
+                            & !(0x0003 << (field_index * 2)))
+                            | (0x0002 << (field_index * 2))
+                    }
+                    0x0002 => {
+                        current_playfield.state[ring_index] = (current_playfield.state[ring_index]
+                            & !(0x0003 << (field_index * 2)))
+                            | (0x0001 << (field_index * 2))
+                    }
+                    _ => panic!(),
+                }
+            }
+        }
+
+        current_playfield
+    }
+
+    //ab hier wirds schwammig
+    pub fn generate_won_and_lost_playfields() -> (HashSet<EfficientPlayField>, HashSet<EfficientPlayField>) {
+        let mut won_set = HashSet::<EfficientPlayField>::new();
+        let mut lost_set = HashSet::<EfficientPlayField>::new();
+
+        let won_ended_set = Self::generate_ended_game_plafields();
+
+        for current_playfield in won_ended_set {
+            current_playfield.mark_won(won_set, lost_set);
+        }
+
+        (won_set, lost_set)
+    }
+
+    fn mark_lost(&self, mut won_set: HashSet<EfficientPlayField>, mut lost_set: HashSet<EfficientPlayField>) {
+        if won_set.insert(self.clone()) {
+            for current_playfield in self.get_backward_moves(PlayerColor::White) {
+                current_playfield.mark_won(won_set, lost_set);
+            }
+        }
+    }
+
+    fn mark_won(&mut self, mut won_set: HashSet<EfficientPlayField>, lost_set: HashSet<EfficientPlayField>) {
+        if won_set.insert(self.clone()) {
+            for mut current_playfield in self.get_backward_moves(PlayerColor::White) {
+                let mut check_var = 0;
+
+                for current_forward in current_playfield.get_forward_moves(PlayerColor::Black) {
+                    if won_set.get(&current_forward) == None {
+                        check_var += 1;
+                        break;
+                    }
+                }
+
+                if check_var == 0 {
+                    current_playfield.mark_lost(won_set, lost_set);
+                }
+            }
+        }
+    }
+
+    /*
+    mark_lost(P)
+    if (P !∈ L)
+        L:= L ∪ {P}         //Globale Variable
+        for z ∈ rückwärtsZüge(P)
+            P' = z(P)
+            mark_won(P')
+
+    mark_won(P)
+        if (P !∈ W)
+            W:= W ∪ {P}         //Globale Variable
+            for z ∈ rückwärtsZüge(P)
+                P' = z(P)
+                if z'(P') ∈ W für alle z' ∈ vorwärtsZüge(P')
+                    mark_lost(P')
+    */
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::game::efficient_state::EfficientPlayField;
+
+    #[test]
+    fn test_generate_permutations() {
+        let mut permutations = Vec::<u16>::new();
+
+        for w_count in 0..=6 {
+            let s_count = 2;
+            EfficientPlayField::generate_permutations(0, s_count, w_count, &mut permutations);
+        }
+
+        for permutation in permutations {
+            let string_output = EfficientPlayField::as_string(permutation);
+            //println!("{:016b}", permutation);
+            println!("{}", string_output);
+        }
     }
 }
