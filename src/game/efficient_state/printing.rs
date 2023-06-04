@@ -102,4 +102,27 @@ impl EfficientPlayField {
             _ => panic!(),
         }
     }
+
+    /// puts playfield into string-representation
+    pub fn to_string(&self) -> String {
+        let bit_mask = 3u16;
+        let mut output_string = String::new();
+
+        for i in 0..3 {
+            for j in 0..8 {
+                let current_element = (self.state[i] & (bit_mask << (2 * j))) >> (2 * j);
+
+                match current_element {
+                    0x0000 => output_string.push('E'),
+                    0x0001 => output_string.push('W'),
+                    0x0002 => output_string.push('B'),
+                    _ => {}
+                }
+            }
+            output_string.push('\n');
+        }
+        output_string.push('\n');
+
+        output_string
+    }
 }
