@@ -752,9 +752,8 @@ impl EfficientPlayField {
                 continue;
             }
 
+            // TODO use the in-place mutable version here for more preformance
             //let ring_backup = self.state[ring_index];
-            //self.state[ring_index] |= <PlayerColor as Into<u16>>::into(stone_color) << (field_index * 2);
-
             let mut modified_self = match ring_index {
                 0 => EfficientPlayField {
                     state: [
@@ -815,56 +814,34 @@ impl EfficientPlayField {
             let ring_index = (i / 8) as usize;
             let field_index = i % 8;
 
-            // to avoid placing stones onto already present mills
-            if (pf.state[ring_index] & (3u16 << (field_index * 2))) != 0 {
-                continue;
-            }
-
             let mut pf = pf.clone();
-            pf.state[ring_index] |= 0x0002 << (field_index * 2);
-            //println!("{clone}");
+            pf.state[ring_index] |= 2u16 << (field_index * 2);
 
             for j in (i + 1)..24 {
                 let ring_index = (j / 8) as usize;
                 let field_index = j % 8;
 
-                // to avoid placing stones onto already present mills
-                if (pf.state[ring_index] & (3u16 << (field_index * 2))) != 0 {
-                    continue;
-                }
-
                 let mut pf = pf.clone();
-                pf.state[ring_index] |= 0x0002 << (field_index * 2);
-                //println!("{clone}");
+                pf.state[ring_index] |= 2u16 << (field_index * 2);
 
                 for k in (j + 1)..24 {
                     let ring_index = (k / 8) as usize;
                     let field_index = k % 8;
 
-                    // to avoid placing stones onto already present mills
-                    if (pf.state[ring_index] & (3u16 << (field_index * 2))) != 0 {
-                        continue;
-                    }
-
                     let mut pf = pf.clone();
-                    pf.state[ring_index] |= 0x0002 << (field_index * 2);
-                    //println!("{clone}");
+                    pf.state[ring_index] |= 2u16 << (field_index * 2);
 
                     for l in (k + 1)..24 {
                         let ring_index = (l / 8) as usize;
                         let field_index = l % 8;
 
-                        // to avoid placing stones onto already present mills
-                        if (pf.state[ring_index] & (3u16 << (field_index * 2))) != 0 {
-                            continue;
-                        }
-
                         let mut pf = pf.clone();
-                        pf.state[ring_index] |= 0x0002 << (field_index * 2);
-                        //println!("{clone}");
+                        pf.state[ring_index] |= 2u16 << (field_index * 2);
 
                         black_only.insert(if canonical_form { pf.get_canonical_form() } else { pf });
 
+						// Adding combinations of 4<= playfieds to the black only set
+                        // 4 <= due to 3 can't be enclosed by white stones because of possible jumping
                         pf.place_stones_across_playfield(PlayerColor::Black, 7, 0, &mut black_only, canonical_form);
                     }
                 }
@@ -874,10 +851,12 @@ impl EfficientPlayField {
         //black_only.iter();
     }
 
-    fn try_to_enclose(&mut self, set: &mut HashSet<EfficientPlayField>) {
+    fn enclose_if_possible(&mut self, set: &mut HashSet<EfficientPlayField>) -> bool {
         for ring_index in 0..3 {
             for field_index in 0..8 {}
         }
+
+        false
     }
 
     //ab hier wirds schwammig
