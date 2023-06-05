@@ -565,7 +565,7 @@ impl EfficientPlayField {
         empty_stones_count: usize,
         playfields: &mut HashSet<EfficientPlayField>,
     ) {
-        println!("Recursive Call!");
+        //println!("Recursive Call!");
 
         // insert if everything has been placed
         if black_stones_count == 0 && white_stones_count == 0 && empty_stones_count == 0 {
@@ -579,7 +579,7 @@ impl EfficientPlayField {
             ring_index += 1;
         }
 
-        // if current field is empty
+        // if current field is not empty
         if (self.state[ring_index] & (0x0003 << (field_index * 2))) != 0 {
             self.clone().generate_playfields_recursive(
                 ring_index,
@@ -685,6 +685,74 @@ impl EfficientPlayField {
         current_playfield
     }
 
+    pub fn generate_ended_game_playfields1() -> HashSet<EfficientPlayField> {
+        println!("Test!");
+
+        let mut won_plafields = HashSet::<EfficientPlayField>::new();
+
+        //all possible placements of the muehle
+        let muehle_placement_playfields = Self::generate_muehle_placements();
+
+        for template_field in muehle_placement_playfields {
+            // placing the first black stone
+            for index_stone_1 in 0..24 {
+                // to avoid placing stones onto already present mills
+                if (template_field.state[index_stone_1 / 8] & (3u16 << ((index_stone_1 % 8) * 2))) != 0 {
+                    continue;
+                }
+
+                let mut clone1 = template_field.clone();
+                clone1.state[index_stone_1 / 8] |= 0x0002 << ((index_stone_1 % 8) * 2);
+
+                // for placing the second black stone
+                for index_stone_2 in (index_stone_1 + 1)..24 {
+                    if (template_field.state[index_stone_2 / 8] & (0x0003 << ((index_stone_2 % 8) * 2))) != 0 {
+                        continue;
+                    }
+
+                    let mut clone2 = clone1.clone();
+                    clone2.state[index_stone_2 / 8] |= 0x0002 << ((index_stone_2 % 8) * 2);
+
+                    //insert rest of white stones
+                    // for white_stones_count in 0..=6 {
+                    println!("Calling recursion");
+                    clone2.place_white_stones_across_playfield(6, 0, &mut won_plafields);
+                    // }
+                }
+            }
+        }
+        won_plafields
+    }
+
+    fn place_white_stones_across_playfield(
+        &mut self,
+        stone_count_left: u32,
+        start_index: u32,
+        set: &mut HashSet<EfficientPlayField>,
+    ) {
+        for i in start_index..24 {
+            let ring_index = (i / 8) as usize;
+            let field_index = i % 8;
+
+            if (self.state[(i / 8) as usize] & (3u16 << ((i % 8) * 2))) != 0 {
+                continue;
+            }
+
+            let ring_backup = self.state[ring_index];
+            self.state[ring_index] |= 0x0001 << (field_index * 2);
+
+            //set.insert(EfficientPlayField { state: [self.state[(i / 8) as usize] | (0x0001 << ((i % 8) * 2)), self.state[((i / 8)) as usize + 1]] });
+            set.insert(self.clone());
+            self.state[ring_index] = ring_backup;
+
+            if 0 < stone_count_left && start_index < 23 {
+                self.place_white_stones_across_playfield(stone_count_left - 1, start_index + 1, set);
+            }
+
+            // Maybe move insert right here?
+        }
+    }
+
     //ab hier wirds schwammig
     /*     pub fn generate_won_and_lost_playfields() -> (HashSet<EfficientPlayField>, HashSet<EfficientPlayField>) {
         let mut won_set = HashSet::<EfficientPlayField>::new();
@@ -763,6 +831,10 @@ mod tests {
             println!("{}", string_output);
         }
     } */
+
+    fn get_tests_set() -> Vec<&'static str> {
+        vec!["WWEEEEEWEEEEEEEEEEEEEEEE"]
+    }
 
     #[test]
     fn test_invert_playfield() {
@@ -868,7 +940,7 @@ mod tests {
 
     #[test]
     fn test_generate_ended_game_playfields() {
-        let set = EfficientPlayField::generate_ended_game_plafields(3);
+        let set = EfficientPlayField::generate_ended_game_playfields1();
 
         let mut i = 0;
         set.iter().for_each(|pf| {
