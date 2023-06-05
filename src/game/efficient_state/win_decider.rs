@@ -685,7 +685,7 @@ impl EfficientPlayField {
         current_playfield
     }
 
-    fn generate_white_won_configurations(in_canonical_form: bool) -> HashSet<EfficientPlayField> {
+    fn generate_white_won_configurations(canonical_form: bool) -> HashSet<EfficientPlayField> {
         //println!("Test");
         let mut won_set = HashSet::<EfficientPlayField>::new();
 
@@ -703,8 +703,8 @@ impl EfficientPlayField {
                     continue;
                 }
 
-                let mut clone = config.clone();
-                clone.state[ring_index] |= 0x0002 << (field_index * 2);
+                let mut config = config.clone();
+                config.state[ring_index] |= 0x0002 << (field_index * 2);
                 //println!("{clone}");
 
                 for j in (i + 1)..24 {
@@ -712,34 +712,37 @@ impl EfficientPlayField {
                     let field_index = j % 8;
 
                     // to avoid placing stones onto already present mills
-                    if (clone.state[ring_index] & (3u16 << (field_index * 2))) != 0 {
+                    if (config.state[ring_index] & (3u16 << (field_index * 2))) != 0 {
                         continue;
                     }
 
-                    let mut clone = clone.clone();
-                    clone.state[ring_index] |= 0x0002 << (field_index * 2);
+                    let mut config = config.clone();
+                    config.state[ring_index] |= 0x0002 << (field_index * 2);
                     //println!("{clone}");
 
-                    won_set.insert(if in_canonical_form {
-                        clone.get_canonical_form()
+                    won_set.insert(if canonical_form {
+                        config.get_canonical_form()
                     } else {
-                        clone
+                        config
                     });
 
-                    clone.place_white_stones_across_playfield(6, 0, &mut won_set, in_canonical_form);
+                    config.place_stones_across_playfield(PlayerColor::White, 6, 0, &mut won_set, canonical_form);
                 }
             }
         }
 
+        //Self::add_white_won_configurations_enclosed_to(&mut won_set, canonical_form);
+
         won_set
     }
 
-    fn place_white_stones_across_playfield(
-        &mut self,
+    fn place_stones_across_playfield(
+        &self,
+        stone_color: PlayerColor,
         recursion_depth: u32,
         start_index: u32,
         set: &mut HashSet<EfficientPlayField>,
-        in_canonical_form: bool,
+        canonical_form: bool,
     ) {
         for i in start_index..24 {
             let ring_index = (i / 8) as usize;
@@ -749,26 +752,131 @@ impl EfficientPlayField {
                 continue;
             }
 
-            let ring_backup = self.state[ring_index];
-            self.state[ring_index] |= 0x0001 << (field_index * 2);
+            //let ring_backup = self.state[ring_index];
+            //self.state[ring_index] |= <PlayerColor as Into<u16>>::into(stone_color) << (field_index * 2);
 
-            //set.insert(EfficientPlayField { state: [self.state[(i / 8) as usize] | (0x0001 << ((i % 8) * 2)), self.state[((i / 8)) as usize + 1]] });
-            set.insert(if in_canonical_form {
-                self.get_canonical_form()
+            let mut modified_self = match ring_index {
+                0 => EfficientPlayField {
+                    state: [
+                        self.state[ring_index] | (<PlayerColor as Into<u16>>::into(stone_color) << (field_index * 2)),
+                        self.state[ring_index + 1],
+                        self.state[ring_index + 2],
+                    ],
+                },
+                1 => EfficientPlayField {
+                    state: [
+                        self.state[ring_index - 1],
+                        self.state[ring_index] | (<PlayerColor as Into<u16>>::into(stone_color) << (field_index * 2)),
+                        self.state[ring_index + 1],
+                    ],
+                },
+                2 => EfficientPlayField {
+                    state: [
+                        self.state[ring_index - 2],
+                        self.state[ring_index - 1],
+                        self.state[ring_index] | (<PlayerColor as Into<u16>>::into(stone_color) << (field_index * 2)),
+                    ],
+                },
+                _ => EfficientPlayField::default(), // neglected panic!
+            };
+
+            set.insert(if canonical_form {
+                modified_self.get_canonical_form()
             } else {
-                self.clone()
+                modified_self
             });
-            //println!("{self}");
 
             if 24 <= start_index {
                 return;
             } else if 1 < recursion_depth {
-                self.place_white_stones_across_playfield(recursion_depth - 1, i + 1, set, in_canonical_form);
+                modified_self.place_stones_across_playfield(
+                    stone_color,
+                    recursion_depth - 1,
+                    i + 1,
+                    set,
+                    canonical_form,
+                );
             }
 
-            self.state[ring_index] = ring_backup;
+            //self.state[ring_index] = ring_backup;
+        }
+    }
 
-            // Maybe move insert right here?
+    // schwarz iterative random, aähnlich so wie in den rekusiven AUfruf oben
+    // pro stein, alle züge mit weiß abdecken
+    //   wenn 9 weiße setine zu platzieren sind aber noch schwarz oder mehr weiße steine benötigt werden -> continue
+    // wenn alles blockiert und übrige weiß > 0 -> random übrige schwarze und weiße platzieren in empty fields
+    fn add_white_won_configurations_enclosed_to(set: &mut HashSet<EfficientPlayField>, canonical_form: bool) {
+        let pf = EfficientPlayField::default();
+        let mut black_only = HashSet::<EfficientPlayField>::new();
+        let mut won_set_enclosed = HashSet::<EfficientPlayField>::new();
+
+        for i in 0..24 {
+            let ring_index = (i / 8) as usize;
+            let field_index = i % 8;
+
+            // to avoid placing stones onto already present mills
+            if (pf.state[ring_index] & (3u16 << (field_index * 2))) != 0 {
+                continue;
+            }
+
+            let mut pf = pf.clone();
+            pf.state[ring_index] |= 0x0002 << (field_index * 2);
+            //println!("{clone}");
+
+            for j in (i + 1)..24 {
+                let ring_index = (j / 8) as usize;
+                let field_index = j % 8;
+
+                // to avoid placing stones onto already present mills
+                if (pf.state[ring_index] & (3u16 << (field_index * 2))) != 0 {
+                    continue;
+                }
+
+                let mut pf = pf.clone();
+                pf.state[ring_index] |= 0x0002 << (field_index * 2);
+                //println!("{clone}");
+
+                for k in (j + 1)..24 {
+                    let ring_index = (k / 8) as usize;
+                    let field_index = k % 8;
+
+                    // to avoid placing stones onto already present mills
+                    if (pf.state[ring_index] & (3u16 << (field_index * 2))) != 0 {
+                        continue;
+                    }
+
+                    let mut pf = pf.clone();
+                    pf.state[ring_index] |= 0x0002 << (field_index * 2);
+                    //println!("{clone}");
+
+                    for l in (k + 1)..24 {
+                        let ring_index = (l / 8) as usize;
+                        let field_index = l % 8;
+
+                        // to avoid placing stones onto already present mills
+                        if (pf.state[ring_index] & (3u16 << (field_index * 2))) != 0 {
+                            continue;
+                        }
+
+                        let mut pf = pf.clone();
+                        pf.state[ring_index] |= 0x0002 << (field_index * 2);
+                        //println!("{clone}");
+
+                        black_only.insert(if canonical_form { pf.get_canonical_form() } else { pf });
+
+                        pf.place_stones_across_playfield(PlayerColor::Black, 7, 0, &mut black_only, canonical_form);
+                    }
+                }
+            }
+        }
+
+        //black_only.iter();
+    }
+
+    fn try_to_enclose(&mut self, set: &mut HashSet<EfficientPlayField>) {
+        for ring_index in 0..3 {
+            for field_index in 0..8 {}
         }
     }
 
