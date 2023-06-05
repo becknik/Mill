@@ -685,56 +685,67 @@ impl EfficientPlayField {
         current_playfield
     }
 
-    pub fn generate_ended_game_playfields1() -> HashSet<EfficientPlayField> {
-        println!("Test!");
+    fn generate_white_won_configurations(in_canonical_form: bool) -> HashSet<EfficientPlayField> {
+        //println!("Test");
+        let mut won_set = HashSet::<EfficientPlayField>::new();
 
-        let mut won_plafields = HashSet::<EfficientPlayField>::new();
+        let configs_with_white_mill = Self::generate_muehle_placements();
 
-        //all possible placements of the muehle
-        let muehle_placement_playfields = Self::generate_muehle_placements();
+        for config in configs_with_white_mill {
+            //println!("{config}");
 
-        for template_field in muehle_placement_playfields {
-            // placing the first black stone
-            for index_stone_1 in 0..24 {
+            for i in 0..24 {
+                let ring_index = (i / 8) as usize;
+                let field_index = i % 8;
+
                 // to avoid placing stones onto already present mills
-                if (template_field.state[index_stone_1 / 8] & (3u16 << ((index_stone_1 % 8) * 2))) != 0 {
+                if (config.state[ring_index] & (3u16 << (field_index * 2))) != 0 {
                     continue;
                 }
 
-                let mut clone1 = template_field.clone();
-                clone1.state[index_stone_1 / 8] |= 0x0002 << ((index_stone_1 % 8) * 2);
+                let mut clone = config.clone();
+                clone.state[ring_index] |= 0x0002 << (field_index * 2);
+                //println!("{clone}");
 
-                // for placing the second black stone
-                for index_stone_2 in (index_stone_1 + 1)..24 {
-                    if (template_field.state[index_stone_2 / 8] & (0x0003 << ((index_stone_2 % 8) * 2))) != 0 {
+                for j in (i + 1)..24 {
+                    let ring_index = (j / 8) as usize;
+                    let field_index = j % 8;
+
+                    // to avoid placing stones onto already present mills
+                    if (clone.state[ring_index] & (3u16 << (field_index * 2))) != 0 {
                         continue;
                     }
 
-                    let mut clone2 = clone1.clone();
-                    clone2.state[index_stone_2 / 8] |= 0x0002 << ((index_stone_2 % 8) * 2);
+                    let mut clone = clone.clone();
+                    clone.state[ring_index] |= 0x0002 << (field_index * 2);
+                    //println!("{clone}");
 
-                    //insert rest of white stones
-                    // for white_stones_count in 0..=6 {
-                    println!("Calling recursion");
-                    clone2.place_white_stones_across_playfield(6, 0, &mut won_plafields);
-                    // }
+                    won_set.insert(if in_canonical_form {
+                        clone.get_canonical_form()
+                    } else {
+                        clone
+                    });
+
+                    clone.place_white_stones_across_playfield(6, 0, &mut won_set, in_canonical_form);
                 }
             }
         }
-        won_plafields
+
+        won_set
     }
 
     fn place_white_stones_across_playfield(
         &mut self,
-        stone_count_left: u32,
+        recursion_depth: u32,
         start_index: u32,
         set: &mut HashSet<EfficientPlayField>,
+        in_canonical_form: bool,
     ) {
         for i in start_index..24 {
             let ring_index = (i / 8) as usize;
             let field_index = i % 8;
 
-            if (self.state[(i / 8) as usize] & (3u16 << ((i % 8) * 2))) != 0 {
+            if (self.state[ring_index] & (3u16 << (field_index * 2))) != 0 {
                 continue;
             }
 
@@ -742,12 +753,20 @@ impl EfficientPlayField {
             self.state[ring_index] |= 0x0001 << (field_index * 2);
 
             //set.insert(EfficientPlayField { state: [self.state[(i / 8) as usize] | (0x0001 << ((i % 8) * 2)), self.state[((i / 8)) as usize + 1]] });
-            set.insert(self.clone());
-            self.state[ring_index] = ring_backup;
+            set.insert(if in_canonical_form {
+                self.get_canonical_form()
+            } else {
+                self.clone()
+            });
+            //println!("{self}");
 
-            if 0 < stone_count_left && start_index < 23 {
-                self.place_white_stones_across_playfield(stone_count_left - 1, start_index + 1, set);
+            if 24 <= start_index {
+                return;
+            } else if 1 < recursion_depth {
+                self.place_white_stones_across_playfield(recursion_depth - 1, i + 1, set, in_canonical_form);
             }
+
+            self.state[ring_index] = ring_backup;
 
             // Maybe move insert right here?
         }
@@ -939,13 +958,31 @@ mod tests {
     }
 
     #[test]
-    fn test_generate_ended_game_playfields() {
-        let set = EfficientPlayField::generate_ended_game_playfields1();
+    fn generate_white_won_configurations_test() {
+        let won_set = EfficientPlayField::generate_white_won_configurations(false);
+        println!("{}", won_set.len())
 
-        let mut i = 0;
-        set.iter().for_each(|pf| {
-            println!("> PlayField on Index {i}:\n{pf}");
-            i += 1;
-        });
+        /*let mut i = 0;
+        won_set.iter()
+            .filter(|pf| {
+                let mut white_stones_count = 0;
+
+                for i in 0..24 {
+                    let ring_index = (i / 8) as usize;
+                    let field_index = i % 8;
+
+                    let current_index_state = pf.state[ring_index] & (3u16 << (field_index * 2));
+                    if current_index_state == (1u16 << (field_index * 2)) {
+                        white_stones_count += 1;
+                    }
+                }
+
+                white_stones_count == 5
+            })
+            .for_each(|pf| {
+                println!("> PlayField on Index {i}:\n{pf}");
+                i += 1;
+            }
+        );*/
     }
 }
