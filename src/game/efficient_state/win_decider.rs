@@ -719,7 +719,7 @@ impl EfficientPlayField {
             }
         }
 
-        //Self::add_white_won_configurations_enclosed_to(&mut won_set, canonical_form);
+        Self::add_white_won_configurations_enclosed_to_won_set(&mut won_set, canonical_form);
 
         won_set
     }
@@ -727,7 +727,7 @@ impl EfficientPlayField {
     fn place_stones_across_playfield(
         &self,
         stone_color: PlayerColor,
-        recursion_depth: u32,
+        recursion_depth: usize, //from u32 to usize
         start_index: u32,
         set: &mut HashSet<EfficientPlayField>,
         canonical_form: bool,
@@ -793,10 +793,13 @@ impl EfficientPlayField {
     // pro stein, alle züge mit weiß abdecken
     //   wenn 9 weiße setine zu platzieren sind aber noch schwarz oder mehr weiße steine benötigt werden -> continue
     // wenn alles blockiert und übrige weiß > 0 -> random übrige schwarze und weiße platzieren in empty fields
-    fn add_white_won_configurations_enclosed_to(set: &mut HashSet<EfficientPlayField>, canonical_form: bool) {
+    fn add_white_won_configurations_enclosed_to_won_set(
+        won_set: &mut HashSet<EfficientPlayField>,
+        canonical_form: bool,
+    ) {
         let pf = EfficientPlayField::default();
         let mut black_only = HashSet::<EfficientPlayField>::new();
-        let mut won_set_enclosed = HashSet::<EfficientPlayField>::new();
+        //let mut won_set_enclosed = HashSet::<EfficientPlayField>::new();
 
         for i in 0..24 {
             let ring_index = (i / 8) as usize;
@@ -828,23 +831,153 @@ impl EfficientPlayField {
 
                         black_only.insert(if canonical_form { pf.get_canonical_form() } else { pf });
 
-						// Adding combinations of 4<= playfieds to the black only set
+                        // Adding combinations of 4<= playfieds to the black only set
                         // 4 <= due to 3 can't be enclosed by white stones because of possible jumping
-                        pf.place_stones_across_playfield(PlayerColor::Black, 7, 0, &mut black_only, canonical_form);
+                        pf.place_stones_across_playfield(PlayerColor::Black, 5, 0, &mut black_only, canonical_form);
                     }
                 }
             }
         }
 
         //black_only.iter();
+        for mut playfield in black_only {
+            playfield.enclose_if_possible(won_set, true);
+        }
     }
 
-    fn enclose_if_possible(&mut self, set: &mut HashSet<EfficientPlayField>) -> bool {
-        for ring_index in 0..3 {
-            for field_index in 0..8 {}
+    // Returns self with added white stones that enclose black stones,
+    // and if possible extra placements of left over white stones
+    fn enclose_if_possible(&mut self, set: &mut HashSet<EfficientPlayField>, canonical_form: bool) -> bool {
+        let move_placements = self.get_forward_move_placements();
+        let length = move_placements.len();
+
+        // if there are more unique placements than 9, nothing is done
+        if length > 9 {
+            return false;
         }
 
-        false
+        // places a white stone on all possible placements
+        for placement in move_placements {
+            self.state[placement.0] |= placement.1;
+        }
+
+        // insert playfield with the enclosure without extra stones placed
+        set.insert(if canonical_form {
+            self.clone().get_canonical_form()
+        } else {
+            self.clone()
+        });
+
+        // if there are leftovers, all possible placements are done and added to the set
+        let left_overs = 9 - length;
+        self.place_stones_across_playfield(PlayerColor::White, left_overs, 0, set, true);
+
+        true
+    }
+
+    // Returns a Set containing ring_index
+    // and a mask containing the white stone at the right placement field for the enclosure for one stone
+    fn get_move_placements(
+        &mut self,
+        start_ring_index: usize,
+        start_fields_index: u16,
+        direction: MoveDirection,
+    ) -> HashSet<(usize, u16)> {
+        let mut move_placements = HashSet::<(usize, u16)>::new();
+
+        if let MoveDirection::AcrossRings { target_ring_index } = direction {
+            let placement_mask = 0x0001 << start_fields_index;
+
+            move_placements.insert((target_ring_index, placement_mask));
+        } else if let MoveDirection::OnRing { target_field_index } = direction {
+            let placement_mask = 0x0001 << target_field_index;
+
+            move_placements.insert((start_ring_index, placement_mask));
+        }
+
+        return move_placements;
+    }
+
+    // Returns all placement_masks with the correct placement of the white stone for the enclosure
+    pub fn get_forward_move_placements(&mut self) -> HashSet<(usize, u16)> {
+        let mut output_placements = HashSet::<(usize, u16)>::new();
+
+        for ring_index in 0..3 {
+            for field_index in (0..16).step_by(2) {
+                let current_field_state = self.state[ring_index] & (3u16 << field_index);
+
+                // If the current field is empty, we wont check possible placements
+                if current_field_state == 0 {
+                    continue;
+                }
+
+                // After this, all possible enclose placements are added into the Set
+
+                let ring_neighbors_indices = [(field_index + 14) % 16, (field_index + 18) % 16];
+                for neighbor_index in ring_neighbors_indices {
+                    // Neighbor field state is empty - neighbor_index already are representational index (0 <= i < 16)
+                    if (self.state[ring_index] & (3u16 << neighbor_index)) == 0 {
+                        let current_move_placements = self.get_move_placements(
+                            ring_index,
+                            field_index,
+                            MoveDirection::OnRing {
+                                target_field_index: neighbor_index,
+                            },
+                        );
+                        output_placements.extend(current_move_placements);
+                    }
+                }
+
+                // Check for possible over-ring moves
+                if (field_index % 4) == 0 {
+                    let next_rings_field_state = self.state[(ring_index + 1) % 3] & (3u16 << field_index);
+                    let previous_rings_field_state = self.state[(ring_index + 2) % 3] & (3u16 << field_index);
+
+                    match ring_index {
+                        // Inner Ring
+                        0 if next_rings_field_state == 0 => {
+                            let current_move_placements = self.get_move_placements(
+                                0,
+                                field_index,
+                                MoveDirection::AcrossRings { target_ring_index: 1 },
+                            );
+                            output_placements.extend(current_move_placements);
+                        }
+                        // Mid Ring
+                        1 => {
+                            if previous_rings_field_state == 0 {
+                                let current_move_placements = self.get_move_placements(
+                                    1,
+                                    field_index,
+                                    MoveDirection::AcrossRings { target_ring_index: 0 },
+                                );
+                                output_placements.extend(current_move_placements);
+                            }
+
+                            if next_rings_field_state == 0 {
+                                let current_move_placements = self.get_move_placements(
+                                    1,
+                                    field_index,
+                                    MoveDirection::AcrossRings { target_ring_index: 2 },
+                                );
+                                output_placements.extend(current_move_placements);
+                            }
+                        }
+                        // Outer Ring
+                        2 if previous_rings_field_state == 0 => {
+                            let current_move_placements = self.get_move_placements(
+                                2,
+                                field_index,
+                                MoveDirection::AcrossRings { target_ring_index: 1 },
+                            );
+                            output_placements.extend(current_move_placements);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+        output_placements
     }
 
     //ab hier wirds schwammig
