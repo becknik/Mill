@@ -6,7 +6,7 @@ use super::MoveDirection;
 use crate::game::PlayerColor;
 
 impl EfficientPlayField {
-    /// Returns the bit masks for the fields that can be of the player with player_color
+    /// Returns the bit masks for the fields that can be taken by the player with player_color
     fn get_fields_to_take(&self, player_color: PlayerColor) -> Vec<(usize, u16)> {
         let mut all_stone_bitmasks = Vec::<(usize, u16)>::new();
         let mut not_in_mill_bitsmasks = Vec::<(usize, u16)>::new();
@@ -19,7 +19,7 @@ impl EfficientPlayField {
                     continue;
                 }
 
-                let bit_mask = 0x0003 << field_index;
+                let bit_mask = 3u16 << field_index;
                 all_stone_bitmasks.push((ring_index, bit_mask));
 
                 if 0 == self.get_mill_count(
@@ -42,14 +42,10 @@ impl EfficientPlayField {
         }
     }
 
-    /// Simulates a move of the stones of the start fields and ring index to either a it's neighboring target index or
-    /// the start index on another ring, which is determined by the [MoveDirection] enum.
-    ///
     /// Preconditions:
     /// - Indices should already be in "representation form" (= 0 <= x < 16).step_by(2)
     /// - The target field/ the start index on the other ring must be empty
-    // TODO test if out-of-place performs better here
-    fn simulate_move_get_playfields(
+    fn simulate_moves(
         &mut self,
         fields_to_take: &Vec<(usize, u16)>,
         start_ring_index: usize,
@@ -124,28 +120,24 @@ impl EfficientPlayField {
         return simulated_playfields;
     }
 
-    pub fn get_forward_moves(&mut self, player_color: PlayerColor) -> Vec<EfficientPlayField> {
+    pub fn generate_forward_moves(&mut self, player_color: PlayerColor) -> Vec<EfficientPlayField> {
         let fields_to_take = self.get_fields_to_take(!player_color);
 
-        let mut output_playfields = Vec::<EfficientPlayField>::new();
+        let mut forward_moved_playfields = Vec::<EfficientPlayField>::new();
 
         for ring_index in 0..3 {
             for field_index in (0..16).step_by(2) {
-                // Current field state sifted to the LSB
                 let current_field_state = (self.state[ring_index] & (3u16 << field_index)) >> field_index;
-
-                // If the current field is empty, we wont make any adjustments to the return values
                 if current_field_state == 0 {
                     continue;
                 }
 
-                // In this branch the current colors possible moves & => movements into a mill should be figured out
                 if current_field_state == <PlayerColor as Into<u16>>::into(player_color) {
-                    let ring_neighbors_indices = [(field_index + 14) % 16, (field_index + 18) % 16];
-                    for neighbor_index in ring_neighbors_indices {
-                        // Neighbor field state is empty - neighbor_index already are representational index (0 <= i < 16)
+                    let neighbors_indices_on_ring = [(field_index + 14) % 16, (field_index + 18) % 16];
+                    for neighbor_index in neighbors_indices_on_ring {
+
                         if (self.state[ring_index] & (3u16 << neighbor_index)) == 0 {
-                            let mut current_move_playfields = self.simulate_move_get_playfields(
+                            let mut current_move_playfields = self.simulate_moves(
                                 &fields_to_take,
                                 ring_index,
                                 field_index,
@@ -154,61 +146,57 @@ impl EfficientPlayField {
                                 },
                                 current_field_state,
                             );
-                            output_playfields.append(&mut current_move_playfields);
+                            forward_moved_playfields.append(&mut current_move_playfields);
                         }
                     }
 
-                    // Check for possible over-ring moves
                     if (field_index % 4) == 0 {
                         let next_rings_field_state = self.state[(ring_index + 1) % 3] & (3u16 << field_index);
                         let previous_rings_field_state = self.state[(ring_index + 2) % 3] & (3u16 << field_index);
 
                         match ring_index {
-                            // Inner Ring
                             0 if next_rings_field_state == 0 => {
-                                let mut current_move_playfields = self.simulate_move_get_playfields(
+                                let mut current_move_playfields = self.simulate_moves(
                                     &fields_to_take,
                                     0,
                                     field_index,
                                     MoveDirection::AcrossRings { target_ring_index: 1 },
                                     current_field_state,
                                 );
-                                output_playfields.append(&mut current_move_playfields);
+                                forward_moved_playfields.append(&mut current_move_playfields);
                             }
-                            // Mid Ring
                             1 => {
                                 if previous_rings_field_state == 0 {
-                                    let mut current_move_playfields = self.simulate_move_get_playfields(
+                                    let mut current_move_playfields = self.simulate_moves(
                                         &fields_to_take,
                                         1,
                                         field_index,
                                         MoveDirection::AcrossRings { target_ring_index: 0 },
                                         current_field_state,
                                     );
-                                    output_playfields.append(&mut current_move_playfields);
+                                    forward_moved_playfields.append(&mut current_move_playfields);
                                 }
 
                                 if next_rings_field_state == 0 {
-                                    let mut current_move_playfields = self.simulate_move_get_playfields(
+                                    let mut current_move_playfields = self.simulate_moves(
                                         &fields_to_take,
                                         1,
                                         field_index,
                                         MoveDirection::AcrossRings { target_ring_index: 2 },
                                         current_field_state,
                                     );
-                                    output_playfields.append(&mut current_move_playfields);
+                                    forward_moved_playfields.append(&mut current_move_playfields);
                                 }
                             }
-                            // Outer Ring
                             2 if previous_rings_field_state == 0 => {
-                                let mut current_move_playfields = self.simulate_move_get_playfields(
+                                let mut current_move_playfields = self.simulate_moves(
                                     &fields_to_take,
                                     2,
                                     field_index,
                                     MoveDirection::AcrossRings { target_ring_index: 1 },
                                     current_field_state,
                                 );
-                                output_playfields.append(&mut current_move_playfields);
+                                forward_moved_playfields.append(&mut current_move_playfields);
                             }
                             _ => {}
                         }
@@ -216,7 +204,7 @@ impl EfficientPlayField {
                 }
             }
         }
-        output_playfields
+        forward_moved_playfields
     }
 
     fn get_fields_to_place(&self, player_color: PlayerColor) -> Vec<(usize, u16)> {
@@ -922,22 +910,6 @@ impl EfficientPlayField {
 mod tests {
     use crate::game::{efficient_state::EfficientPlayField, PlayerColor};
 
-    /* #[test]
-    fn test_generate_permutations() {
-        let mut permutations = Vec::<u16>::new();
-
-        for w_count in 0..=6 {
-            let s_count = 2;
-            EfficientPlayField::generate_permutations(0, s_count, w_count, &mut permutations);
-        }
-
-        for permutation in permutations {
-            let string_output = EfficientPlayField::to_string(permutation);
-            //println!("{:016b}", permutation);
-            println!("{}", string_output);
-        }
-    } */
-
     fn get_tests_set() -> Vec<&'static str> {
         vec!["WWEEEEEWEEEEEEEEEEEEEEEE"]
     }
@@ -1014,7 +986,7 @@ mod tests {
         println!("{test_playfield}");
         println!("\n--- Fields with simulated moves ---\n");
 
-        let vec = test_playfield.get_forward_moves(PlayerColor::White);
+        let vec = test_playfield.generate_forward_moves(PlayerColor::White);
 
         let mut i = 0;
         vec.iter().for_each(|pf| {
