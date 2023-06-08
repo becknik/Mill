@@ -1,4 +1,9 @@
-use std::collections::HashSet;
+use std::{
+    collections::HashSet,
+    collections::VecDeque,
+    fs::File,
+    io::{BufRead, BufReader, BufWriter, Write},
+};
 
 use super::DirectionToCheck;
 use super::EfficientPlayField;
@@ -819,58 +824,88 @@ impl EfficientPlayField {
         output_placements
     }
 
-    /* pub fn generate_all_won_lost_playfields(&self, initial_set: HashSet<EfficientPlayField>) -> () {
-        let mut won_set = HashSet::<EfficientPlayField>::new();
-        let mut lost_set = HashSet::<EfficientPlayField>::new();
+    pub fn generate_all_won_playfields() -> HashSet<EfficientPlayField> {
+        let mut won_set = EfficientPlayField::generate_white_won_configurations(true);
+        println!("> Created WON set containing {} elements", won_set.len());
 
-        let mut work_stack = Vec::<EfficientPlayField>::new();
+        let mut work_queue = VecDeque::<(usize, EfficientPlayField)>::new();
 
-        won_set = initial_set.clone();
-
-        for pf in initial_set {
-            work_stack.push(pf);
-            lost_set.insert(pf.invert_playfields_stone_colors());
+        for pf in &won_set {
+            // TODO change this to the maximum depth when it is known
+            work_queue.push_back((0, *pf));
         }
+        println!("> Pushed WON sets elements onto queue");
 
-        for mut current in work_stack{
+        // Indicator for who moved last: even => white made last move
+        //let mut path_depth: usize = 0;
 
-            // Indicator for who moved last
-            let mut path_depth = 0;
+        while let Some((reverse_level, mut current)) = work_queue.pop_front() {
+            // White moved last
+            if reverse_level % 2 == 0 {
+                // Every backward move is going to be added:
+                for mut backward_playfield in current.get_backward_moves(PlayerColor::White) {
+                    backward_playfield = backward_playfield.get_canonical_form();
 
-            //White moved last
-            if path_depth % 2 == 0 {
-
-                // Every backward move is going to be added? (shouldnt it be just 1)
-                for backward_playfield in current.get_backward_moves(PlayerColor::White) {
-                    if won_set.contains(&backward_playfield) {
-
-                    }
+                    won_set.insert(backward_playfield);
+                    work_queue.push_back((reverse_level + 1, backward_playfield));
                 }
             }
             //Black moved last
             else {
-                for mut backward_playfield in current.get_backward_moves(PlayerColor::White) {
-                    let mut checker = 0;
+                for mut backward_playfield in current.get_backward_moves(PlayerColor::Black) {
+                    let mut all_forward_moves_in_won = true;
 
                     for forward_playfield in backward_playfield.get_forward_moves(PlayerColor::Black) {
                         if !won_set.contains(&forward_playfield) {
-                            checker += 1;
+                            all_forward_moves_in_won = false;
                         }
                     }
 
                     // Adds the backward_playfield to the sets / work_stack and removes the current worked on element from the stack
-                    if checker == 0 {
+                    if all_forward_moves_in_won {
+                        backward_playfield = backward_playfield.get_canonical_form();
+
                         won_set.insert(backward_playfield);
-                        lost_set.insert(backward_playfield.invert_playfields_stone_colors());
-                        work_stack.push(backward_playfield);
+                        work_queue.push_back((reverse_level + 1, backward_playfield));
                     }
-                    work_stack.remove(0);
                 }
-
             }
-
         }
-    } */
+
+        won_set
+    }
+
+    pub fn input_game_state_decider() {
+        let won_set = EfficientPlayField::generate_all_won_playfields();
+        let mut lost_set = HashSet::<EfficientPlayField>::new();
+
+        for pf in &won_set {
+            lost_set.insert(pf.invert_playfields_stone_colors().get_canonical_form());
+            //TODO kanone?
+        }
+
+        let input_felder_txt =
+            File::open("input_felder.txt").expect("The 'input_felder.txt' file was not found in the projects root...");
+        let reader = BufReader::new(input_felder_txt);
+
+        let output_text = File::create("output.txt").expect("Could not create ro 'output.txt' to write results into");
+        let mut writer = BufWriter::new(output_text);
+
+        for line_content in reader.lines() {
+            let mut playfield = EfficientPlayField::from_coded(&line_content.unwrap());
+            let canonical_form = playfield.get_canonical_form();
+
+            let nash_value = if won_set.contains(&canonical_form) {
+                2
+            } else if lost_set.contains(&canonical_form) {
+                0
+            } else {
+                1
+            };
+
+            writeln!(writer, "{}", nash_value).unwrap();
+        }
+    }
 
     //ab hier wirds schwammig
     /*     pub fn generate_won_and_lost_playfields() -> (HashSet<EfficientPlayField>, HashSet<EfficientPlayField>) {
