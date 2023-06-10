@@ -140,7 +140,6 @@ impl EfficientPlayField {
                 if current_field_state == <PlayerColor as Into<u16>>::into(player_color) {
                     let neighbors_indices_on_ring = [(field_index + 14) % 16, (field_index + 18) % 16];
                     for neighbor_index in neighbors_indices_on_ring {
-
                         if (self.state[ring_index] & (3u16 << neighbor_index)) == 0 {
                             let mut current_move_playfields = self.simulate_moves(
                                 &fields_to_take,
@@ -568,7 +567,7 @@ impl EfficientPlayField {
             }
         }
 
-        Self::add_white_won_configurations_enclosed(&mut won_set, canonical_form);
+        //Self::add_white_won_configurations_enclosed(&mut won_set, canonical_form);
 
         won_set
     }
@@ -618,11 +617,30 @@ impl EfficientPlayField {
                 _ => EfficientPlayField::default(), // neglected panic!
             };
 
-            set.insert(if canonical_form {
-                modified_self.get_canonical_form()
-            } else {
-                modified_self
-            });
+            // for enclosing playfields: only add fields where the amount of white black is equivalent/less to the amount
+            // taken by mills
+            if matches!(stone_color, PlayerColor::Black) {
+                let amount_black_stones = 4 /* black stones placed before calling this method */
+                    + (5 /* stones already placed by this method */ - recursion_depth);
+
+                let white_mill_count = modified_self.get_total_amount_of_mills(PlayerColor::White);
+
+                if amount_black_stones <= (9 - white_mill_count) {
+                    set.insert(if canonical_form {
+                        modified_self.get_canonical_form()
+                    } else {
+                        modified_self
+                    });
+                }
+            }
+            //for not enclosing playfields
+            else {
+                set.insert(if canonical_form {
+                    modified_self.get_canonical_form()
+                } else {
+                    modified_self
+                });
+            }
 
             if 24 <= start_index {
                 return;
@@ -698,13 +716,17 @@ impl EfficientPlayField {
     // Returns self with added white stones that enclose black stones,
     // and if possible extra placements of left over white stones
     fn enclose_if_possible(&mut self, set: &mut HashSet<EfficientPlayField>, canonical_form: bool) {
-        let move_placements = self.get_forward_move_placements();
-        let length = move_placements.len(); // neccessary beacuase of move
+        let white_enclosing_moves = self.get_forward_move_placements();
+        let amount_of_white_moves = white_enclosing_moves.len(); // neccessary beacuase of move
+
+        let black_mill_count = self.get_total_amount_of_mills(PlayerColor::Black);
 
         // if there are less unique placements than 9: place white stones upon those fields to block moves
-        if length <= 9 {
+        // 9 - black_mill_count:  there are some black mills on the playfield, the amount of white placed stone
+        // previously was reduced by the number of black mills
+        if amount_of_white_moves <= 9 - black_mill_count {
             // places a white stone on all possible placements
-            for (ring_index, bitmask_field_index) in move_placements {
+            for (ring_index, bitmask_field_index) in white_enclosing_moves {
                 self.state[ring_index] |= bitmask_field_index;
             }
 
@@ -716,9 +738,36 @@ impl EfficientPlayField {
             });
 
             // if there are leftovers, all possible placements are done and added to the set
-            let left_overs = 9 - length;
+            let left_overs = 9 - amount_of_white_moves - black_mill_count;
             self.place_stones_across_playfield(PlayerColor::White, left_overs, 0, set, canonical_form);
         }
+    }
+
+    // Returns amount of mills present of one color on the playfields
+    fn get_total_amount_of_mills(&self, color: PlayerColor) -> usize {
+        let mut mill_count: usize = 0;
+
+        let mut lane_stone_count = [0; 4];
+        for ring_index in 0..3 {
+            for even_field_index in 0..4 {
+                mill_count += self.get_mill_count(ring_index, even_field_index * 2, DirectionToCheck::OnRing) as usize;
+
+                let current_even_index_state =
+                    (self.state[ring_index] << (even_field_index * 2)) >> (even_field_index * 2);
+
+                if current_even_index_state == color.into() {
+                    lane_stone_count[even_field_index as usize] += 1;
+                }
+            }
+        }
+
+        for elem in lane_stone_count {
+            if elem == 3 {
+                mill_count += 1;
+            }
+        }
+
+        mill_count
     }
 
     // Returns a Set containing ring_index
@@ -744,7 +793,7 @@ impl EfficientPlayField {
         return move_placements;
     }
 
-    // Returns all placement_masks with the correct placement of the white stone for the enclosure
+    // Returns all placement_masks with the correct placement of the white stones for the enclosure
     pub fn get_forward_move_placements(&mut self) -> HashSet<(usize, u16)> {
         let mut output_placements = HashSet::<(usize, u16)>::new();
 
@@ -1083,7 +1132,7 @@ mod tests {
     }
 
     #[test]
-    fn generate_white_won_configurations_test_non_enclosing() {
+    fn test_generate_won_configurations_non_enclosing() {
         let won_set = EfficientPlayField::generate_white_won_configurations(true);
         println!("{}", won_set.len())
 
@@ -1113,8 +1162,7 @@ mod tests {
 
     #[test]
     fn test_generate_enclosed_won_set() {
-        //let mut won_set = HashSet::<EfficientPlayField>::new();
-        let mut won_set = EfficientPlayField::generate_white_won_configurations(true);
+        let mut won_set = HashSet::<EfficientPlayField>::new();
         EfficientPlayField::add_white_won_configurations_enclosed(&mut won_set, true);
 
         println!("{}", won_set.len());
@@ -1151,7 +1199,8 @@ mod tests {
 
     #[test]
     fn test_generate_won_set() {
-        let won_set = EfficientPlayField::generate_white_won_configurations(true);
+        let mut won_set = EfficientPlayField::generate_white_won_configurations(true);
+        EfficientPlayField::add_white_won_configurations_enclosed(&mut won_set, true);
 
         println!("{}", won_set.len());
     }
@@ -1161,5 +1210,4 @@ mod tests {
         let won_set = EfficientPlayField::generate_all_won_playfields();
         println!("{}", won_set.len());
     }
-
 }
