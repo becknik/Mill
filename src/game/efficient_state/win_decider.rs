@@ -846,8 +846,10 @@ impl EfficientPlayField {
                 for mut backward_playfield in current.get_backward_moves(PlayerColor::White) {
                     backward_playfield = backward_playfield.get_canonical_form();
 
-                    won_set.insert(backward_playfield);
-                    work_queue.push_back((reverse_level + 1, backward_playfield));
+                    if !won_set.contains(&backward_playfield) {
+                        won_set.insert(backward_playfield);
+                        work_queue.push_back((reverse_level + 1, backward_playfield));
+                    }
                 }
             }
             //Black moved last
@@ -855,7 +857,7 @@ impl EfficientPlayField {
                 for mut backward_playfield in current.get_backward_moves(PlayerColor::Black) {
                     let mut all_forward_moves_in_won = true;
 
-                    for forward_playfield in backward_playfield.get_forward_moves(PlayerColor::Black) {
+                    for forward_playfield in backward_playfield.generate_forward_moves(PlayerColor::Black) {
                         if !won_set.contains(&forward_playfield) {
                             all_forward_moves_in_won = false;
                         }
@@ -865,8 +867,10 @@ impl EfficientPlayField {
                     if all_forward_moves_in_won {
                         backward_playfield = backward_playfield.get_canonical_form();
 
-                        won_set.insert(backward_playfield);
-                        work_queue.push_back((reverse_level + 1, backward_playfield));
+                        if !won_set.contains(&backward_playfield) {
+                            won_set.insert(backward_playfield);
+                            work_queue.push_back((reverse_level + 1, backward_playfield));
+                        }
                     }
                 }
             }
@@ -1151,4 +1155,11 @@ mod tests {
 
         println!("{}", won_set.len());
     }
+
+    #[test]
+    fn test_generate_all_won_playfields() {
+        let won_set = EfficientPlayField::generate_all_won_playfields();
+        println!("{}", won_set.len());
+    }
+
 }
