@@ -725,7 +725,7 @@ impl EfficientPlayField {
             set.insert(self.clone().get_canonical_form());
 
             // if there are leftovers, all possible placements are done and added to the set
-            let left_overs = max_stone_count - amount_of_white_moves - black_mill_count;
+            let left_overs = 0.max(max_stone_count as i32 - amount_of_white_moves as i32 - black_mill_count as i32) as usize;
 
             self.place_stones_across_playfield(PlayerColor::White, left_overs, 0, set);
         }
@@ -932,20 +932,23 @@ impl EfficientPlayField {
     }
 
     pub fn input_game_state_decider(max_stone_count: usize) {
-        let won_set = EfficientPlayField::generate_all_won_playfields(max_stone_count);
-        let mut lost_set = HashSet::<EfficientPlayField>::new();
-
-        for pf in &won_set {
-            lost_set.insert(pf.invert_playfields_stone_colors().get_canonical_form());
-            //TODO kanone?
-        }
-
         let input_felder_txt = File::open("input_felder_5.txt")
             .expect("The 'input_felder.txt' file was not found in the projects root...");
         let reader = BufReader::new(input_felder_txt);
 
         let output_text = File::create("output.txt").expect("Could not create ro 'output.txt' to write results into");
         let mut writer = BufWriter::new(output_text);
+        writeln!(writer, "> Test!");
+
+        let won_set = EfficientPlayField::generate_all_won_playfields(max_stone_count);
+        writeln!(writer, "> Finished generating all won sets: {}", won_set.len());
+        let mut lost_set = HashSet::<EfficientPlayField>::new();
+
+        for pf in &won_set {
+            lost_set.insert(pf.invert_playfields_stone_colors().get_canonical_form());
+            //TODO kanone?
+        }
+        writeln!(writer, "> Finished generating all lost sets: {}!", lost_set.len());
 
         for line_content in reader.lines() {
             let mut playfield = EfficientPlayField::from_coded(&line_content.unwrap());
