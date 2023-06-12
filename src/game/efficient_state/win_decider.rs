@@ -715,7 +715,7 @@ impl EfficientPlayField {
         // if there are less unique placements than 9: place white stones upon those fields to block moves
         // 9 - black_mill_count:  there are some black mills on the playfield, the amount of white placed stone
         // previously was reduced by the number of black mills
-        if amount_of_white_moves <= 9 - black_mill_count {
+        if amount_of_white_moves <= 0.max(max_stone_count as i32 - black_mill_count as i32) as usize {
             // places a white stone on all possible placements
             for (ring_index, bitmask_field_index) in white_enclosing_moves {
                 self.state[ring_index] |= bitmask_field_index;
