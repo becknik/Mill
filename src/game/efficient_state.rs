@@ -4,12 +4,13 @@
 //! It also holds some tests cases (I was to lazy to implement asserts on) & the assignment 4's test case.
 
 use std::{
-    collections::HashMap,
     fs::File,
-    io::{BufRead, BufReader, BufWriter, Write},
+    io::{BufRead, BufReader, BufWriter, Write}, hash::{Hash, Hasher},
 };
 
-use super::{state, PlayerColor};
+use super::PlayerColor;
+
+use fnv::FnvHashMap;
 
 mod de_encode;
 mod printing;
@@ -24,14 +25,26 @@ mod win_decider;
 /// - 01: white
 /// - 10: black
 /// - 11: undefined -> assert panic!
-#[derive(Copy, Clone, Eq, PartialEq, PartialOrd, Hash, Default)]
+#[derive(Copy, Clone, Eq, PartialEq, PartialOrd, Default)]
 pub struct EfficientPlayField {
     state: [u16; 3],
+}
+
+impl Hash for EfficientPlayField {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.state.hash(state)
+    }
 }
 
 pub struct EfficientPlayField4 {
     states: [u16; 12],
 }
+
+enum RelativePosition {
+    Previous,
+    Next,
+}
+use RelativePosition::*;
 
 impl EfficientPlayField {
     /// Sets the field according to the binary parameters. The indices are specified binary coded
@@ -39,7 +52,7 @@ impl EfficientPlayField {
     /// Handled extreme cases:
     /// - Ensures that black or white fields are replaced by free, vice versa
     /// - The input parameters must have values that make sense, ring_index < 3, index < 8, state < 3
-    pub fn set_field(&mut self, ring_index: usize, index: u32, field_state: u32) {
+    pub fn set_field_state(&mut self, ring_index: usize, index: u32, field_state: u32) {
         // Ensures no 11 exists in the state array
         assert!(
             {
@@ -78,15 +91,52 @@ impl EfficientPlayField {
         self.state[ring_index] = old_ring_state | new_state_mask;
     }
 
+    /// Bitmasks out the specified field and returns it either aligned to the LSB or unaligned as masked out.
+    ///
+    /// The field_index must be < 8!
+    fn get_field_state_at(&self, ring_index: usize, field_index: u16, align_to_lsb: bool) -> u16 {
+        assert!(
+            field_index < 8,
+            "`get_field_state_at` makes use of an abstract index representation"
+        );
+
+        let field_state = self.state[ring_index] & (3u16 << (field_index * 2));
+        return if align_to_lsb {
+            field_state >> (field_index * 2)
+        } else {
+            field_state
+        };
+    }
+
+    fn get_ring_index(ring_index: usize, relative: RelativePosition) -> usize {
+        return (ring_index
+            + match relative {
+                RelativePosition::Previous => 2,
+                RelativePosition::Next => 1,
+            })
+            % 3;
+    }
+
+    /// Returns the (index in representation form, state) of the on-ring neighbor of the specified field.
+    /// No alignment to the LSB is done.
+    fn get_neighbor_field_states(&self, ring_index: usize, field_index: u16) -> [(u16, u16); 2] {
+        let indices = [(field_index + 7) % 8, (field_index + 1) % 8];
+
+        return [
+            (indices[0], self.get_field_state_at(ring_index, indices[0], false)),
+            (indices[1], self.get_field_state_at(ring_index, indices[1], false)),
+        ];
+    }
+
     /// Validates the invariant that no 11 might occur in any position of the array.
     /// If the state array contains such state, this method returns the fields index (ring_index, rect_index)
-    fn assert_state_invariant(&self) -> Option<(usize, u8)> {
+    fn assert_state_invariant(&self) -> Option<(usize, u16)> {
         for ring_index in 0..3 {
-            let ring_state = self.state[ring_index];
+            let _ring_state = self.state[ring_index];
 
-            for i in (0..16).step_by(2) {
-                if (ring_state & (0x03 << i)) == (0x03 << i) {
-                    return Some((ring_index, i));
+            for field_index in 0..8 {
+                if self.get_field_state_at(ring_index, field_index, true) == 3u16 {
+                    return Some((ring_index, field_index));
                 }
             }
         }
@@ -98,8 +148,8 @@ impl EfficientPlayField {
         //assert!(amount < 4);
 
         for ring_index in 0..3 {
-            // Due to the ring representation staring on the LSB, we have to shift left 2 fields internally, which
-            // equals 4 bits in total
+            // Due to rep staring on the LSB, we have to shift left
+            // 2 fields to shift, which equals 4 bits in total
             self.state[ring_index] = self.state[ring_index].rotate_left(2 * 2 * amount);
         }
     }
@@ -107,23 +157,19 @@ impl EfficientPlayField {
     /// Swaps the inner ring/ rect in place with the outer ring
     fn swap_rings(&mut self) {
         self.state.swap(0, 2);
-
-        /* let buff = self.state[0];
-        self.state[0] = self.state[2];
-        self.state[2] = buff; */
     }
 
     fn mirror_on_y(&mut self) {
         for ring_index in 0..3 {
-            let i_1 = (3u16 << 2) & self.state[ring_index];
-            let i_2 = (3u16 << 4) & self.state[ring_index];
-            let i_3 = (3u16 << 6) & self.state[ring_index];
+            let i_1 = self.get_field_state_at(ring_index, 1, false);
+            let i_2 = self.get_field_state_at(ring_index, 2, false);
+            let i_3 = self.get_field_state_at(ring_index, 3, false);
 
-            let i_5 = (3u16 << 10) & self.state[ring_index];
-            let i_6 = (3u16 << 12) & self.state[ring_index];
-            let i_7 = (3u16 << 14) & self.state[ring_index];
+            let i_5 = self.get_field_state_at(ring_index, 5, false);
+            let i_6 = self.get_field_state_at(ring_index, 6, false);
+            let i_7 = self.get_field_state_at(ring_index, 7, false);
 
-            // Stancil out the first & fourth index
+            // Mask the first & fourth index
             let i_0_4 = 0b0000_0011_0000_0011u16 & self.state[ring_index];
 
             // Swap the game field's sides
@@ -136,7 +182,7 @@ impl EfficientPlayField {
     /// of the elements in the equivalent class
     // TODO &mut might be a failure... micro benchmark this!
     // pub because of benchmarking
-    #[inline]
+    //#[inline]
     pub fn get_canonical_form(&mut self) -> EfficientPlayField {
         let mut canonical_form = EfficientPlayField::default();
 
@@ -156,7 +202,6 @@ impl EfficientPlayField {
             }
             self.swap_rings();
         }
-
         canonical_form
     }
 
@@ -175,12 +220,12 @@ impl EfficientPlayField {
         }
     }
 
-    /// Calculates the possible moves of player_color, the amount of moves wich lead to a mill for player_color
-    /// and the amount of stones of the other player color, which can be beaten
+    /// Calculates the possible moves of color, the amount of moves wich lead to a mill for color
+    /// and the amount of stones of the other players color, which can be beaten
     ///
     /// It is possibly used as a judging function for the player agent
-    #[inline]
-    pub fn get_move_triple(&mut self, player_color: PlayerColor) -> (u32, u32, u32) {
+    //#[inline]
+    pub fn get_move_triple(&mut self, color: PlayerColor) -> (u32, u32, u32) {
         let mut moves_possible_counter = 0;
         let mut moves_to_mill_counter = 0;
         let mut stones_to_take_counter = 0;
@@ -189,22 +234,19 @@ impl EfficientPlayField {
         let mut overall_stones_of_opposite_color_counter = 0;
 
         for ring_index in 0..3 {
-            for field_index in (0..16).step_by(2) {
+            for field_index in 0..8 {
                 // Current field state sifted to the LSB
-                let current_field_state = (self.state[ring_index] & (3u16 << field_index)) >> field_index;
+                let current_field_state = self.get_field_state_at(ring_index, field_index, true);
 
                 // If the current field is empty, we wont make any adjustments to the return values
                 if current_field_state == 0 {
                     continue;
                 }
 
-                // In this branch the current colors possible moves & => movements into a mill should be figured out
-                if current_field_state == <PlayerColor as Into<u16>>::into(player_color) {
-                    let ring_neighbors_indices = [(field_index + 14) % 16, (field_index + 18) % 16];
-
-                    for neighbor_index in ring_neighbors_indices {
-                        // Neighbor field state is empty - neighbor_index already are representational index (0 <= i < 16)
-                        if (self.state[ring_index] & (3u16 << neighbor_index)) == 0 {
+                // If the current field == color && the on-ring neighbors are empty => movements into a mill possible
+                if current_field_state == color.into() {
+                    for (neighbor_index, neighbor_state) in self.get_neighbor_field_states(ring_index, field_index) {
+                        if neighbor_state == 0 {
                             moves_possible_counter += 1;
 
                             moves_to_mill_counter += self.simulate_move_get_mill_count(
@@ -219,9 +261,11 @@ impl EfficientPlayField {
                     }
 
                     // Check for possible over-ring moves
-                    if (field_index % 4) == 0 {
-                        let next_rings_field_state = self.state[(ring_index + 1) % 3] & (3u16 << field_index);
-                        let previous_rings_field_state = self.state[(ring_index + 2) % 3] & (3u16 << field_index);
+                    if (field_index % 2) == 0 {
+                        let next_rings_field_state =
+                            self.get_field_state_at(Self::get_ring_index(ring_index, Next), field_index, false);
+                        let previous_rings_field_state =
+                            self.get_field_state_at(Self::get_ring_index(ring_index, Previous), field_index, false);
 
                         match ring_index {
                             // Inner Ring
@@ -305,7 +349,7 @@ impl EfficientPlayField {
     /// the start index on another ring, which is determined by the [MoveDirection] enum.
     ///
     /// Preconditions:
-    /// - Indices should already be in "representation form" (= 0 <= x < 16).step_by(2)
+    /// - Indices should already be in "abstract form" x < 8
     /// - The target field/ the start index on the other ring must be empty
     // TODO test if out-of-place performs better here
     fn simulate_move_get_mill_count(
@@ -315,18 +359,20 @@ impl EfficientPlayField {
         direction: MoveDirection,
         color: u16,
     ) -> u32 {
+        assert!(start_fields_index < 8);
+
         // To rollback the in-situ changes on self
         let start_ring_backup = self.state[start_ring_index];
 
         // Clear out the current index, must be done when simulating the moving in general
-        self.state[start_ring_index] &= !(3u16 << start_fields_index);
+        self.state[start_ring_index] &= !(3u16 << (start_fields_index * 2));
 
         let mills_possible = if let MoveDirection::AcrossRings { target_ring_index } = direction {
             // To rollback the second in-situ changes on self
             let target_ring_backup = self.state[target_ring_index];
 
             // Setting the state of the other index, which must be empty
-            self.state[target_ring_index] |= color << start_fields_index;
+            self.state[target_ring_index] |= color << (start_fields_index * 2);
 
             // TODO makes this sense to you, future me? :|
             let mills_possible = self.get_mill_count(target_ring_index, start_fields_index, DirectionToCheck::OnRing);
@@ -337,8 +383,10 @@ impl EfficientPlayField {
 
             mills_possible
         } else if let MoveDirection::OnRing { target_field_index } = direction {
+            assert!(target_field_index < 8);
+
             // Set the empty neighbors value to the old one of the current index:
-            self.state[start_ring_index] |= color << target_field_index;
+            self.state[start_ring_index] |= color << (target_field_index * 2);
 
             // Check for mills after the move now has taken place
             self.get_mill_count(
@@ -362,7 +410,7 @@ impl EfficientPlayField {
     ///
     /// Preconditions:
     /// - The field state of the current index must be not null
-    /// - The fields index must be (0..16).step_by(2) and the ring index 0..3
+    /// - The fields index must be 0..8 and the ring index 0..3
     fn get_mill_count(&self, ring_index: usize, field_index: u16, direction: DirectionToCheck) -> u32 {
         //assert!(field_index < 16);
         //assert!(ring_index < 3);
@@ -379,9 +427,9 @@ impl EfficientPlayField {
         6,7 => 5
         7 => 7
         */
-        let indices_to_rotate = ((field_index - (field_index % 4) + 14) % 16) as u32;
+        let rep_indices_to_rotate = (((field_index - (field_index % 2) + 7) % 8) * 2) as u32;
         // Field state triple containing field_index:
-        let state_triple = self.state[ring_index].rotate_right(indices_to_rotate) & 0b0000_0000_0011_1111u16;
+        let state_triple = self.state[ring_index].rotate_right(rep_indices_to_rotate) & 0b0000_0000_0011_1111u16;
 
         /* 010101 | 101010 */
         if state_triple == 21u16 || state_triple == 42u16 {
@@ -389,8 +437,8 @@ impl EfficientPlayField {
         }
 
         // If index is located in an edge, two triples must be checked for mill occurrence
-        if field_index == 2 || field_index == 6 || field_index == 10 || field_index == 14 {
-            let state_triple = self.state[ring_index].rotate_right(field_index as u32) & 0b000_00000_0011_1111u16;
+        if field_index == 1 || field_index == 3 || field_index == 5 || field_index == 7 {
+            let state_triple = self.state[ring_index].rotate_right((field_index * 2) as u32) & 0b000_00000_0011_1111u16;
             /* 010101 | 101010 */
             if state_triple == 21u16 || state_triple == 42u16 {
                 mill_counter += 1;
@@ -399,22 +447,21 @@ impl EfficientPlayField {
 
         // Argument field index in the middle of a triple and therefore can form a mill connected to the other rings
         if let DirectionToCheck::OnAndAcrossRings { player_color } = direction {
-            //assert!(color < 3);
-
-            if field_index % 4 == 0 {
+            if field_index % 2 == 0 {
                 //assert!(((self.state[ring_index] >> field_index) & 3u16) != 0);
+                let next_rindex_field_state =
+                    self.get_field_state_at(Self::get_ring_index(ring_index, Next), field_index, true);
 
-                let next_indexs_field_state = (self.state[(ring_index + 1) % 3] & (3u16 << field_index)) >> field_index;
-                let next_next_indexs_field_state =
-                    (self.state[(ring_index + 2) % 3] & (3u16 << field_index)) >> field_index;
+                let previous_rindex_field_state =
+                    self.get_field_state_at(Self::get_ring_index(ring_index, Previous), field_index, true);
 
                 // Mill in between rings:
-                if next_indexs_field_state == player_color && next_indexs_field_state == next_next_indexs_field_state {
+                if next_rindex_field_state == player_color && next_rindex_field_state == previous_rindex_field_state
+                {
                     mill_counter += 1;
                 }
             }
         }
-
         mill_counter
     }
 }
@@ -431,53 +478,58 @@ enum DirectionToCheck {
     OnAndAcrossRings { player_color: u16 },
 }
 
-/// Used by the [process_input_felder] method
-pub enum ToWhatToProcess {
-    CanonicalForm,
-    MoveTripel,
-}
+fn process_input_fields_canonical() {
+    let (reader, mut writer) = init_writer_reader("input_felder_4.txt");
+    let mut output_map = FnvHashMap::<EfficientPlayField, usize>::default();
 
-pub fn process_input_felder(outputs_contents: ToWhatToProcess) {
-    let input_felder_txt =
-        File::open("input_felder.txt").expect("The 'input_felder.txt' file was not found in the projects root...");
-    let reader = BufReader::new(input_felder_txt);
+    for (line_index, line_content) in reader.lines().enumerate() {
+        // Idk why but the reference output.txt starts counting on 1...
+        let line_index = line_index + 1;
 
-    let output_text = File::create("output.txt").expect("Could not create ro 'output.txt' to write results into");
-    let mut writer = BufWriter::new(output_text);
+        let mut playfield = EfficientPlayField::from_coded(&line_content.unwrap());
+        println!("{playfield}");
+        let canonical_form = playfield.get_canonical_form();
+        println!("{canonical_form}");
 
-    if let ToWhatToProcess::CanonicalForm = outputs_contents {
-        let mut h_map: HashMap<EfficientPlayField, usize> = HashMap::new();
-
-        for (line_index, line_content) in reader.lines().enumerate() {
-            // Idk why but the reference output.txt starts counting on 1...
-            let line_index = line_index + 1;
-
-            let mut playfield = EfficientPlayField::from_coded(&line_content.unwrap());
-            let canonical_form = playfield.get_canonical_form();
-
-            if let Some(previous_canonical_match) = h_map.get(&canonical_form) {
-                writeln!(writer, "{}", previous_canonical_match).unwrap();
-            } else {
-                h_map.insert(canonical_form, line_index);
+        match output_map.get(&canonical_form) {
+            Some(identical_canonical_index) => writeln!(writer, "{}", identical_canonical_index).unwrap(),
+            None => {
+                output_map.insert(canonical_form, line_index);
                 writeln!(writer, "{}", line_index).unwrap();
             }
         }
-    } else {
-        for (line_index, line_content) in reader.lines().enumerate() {
-            let line_content = line_content.unwrap();
-            let mut playfield = EfficientPlayField::from_coded(&line_content);
-
-            let (x, y, z) = playfield.get_move_triple(PlayerColor::White);
-
-            assert!({
-                println!("Input {line_index}: {line_content}\n{playfield}");
-                println!("Moves: {x}\nMoves->Mill: {y}\nTo Take: {z}");
-                true
-            });
-
-            writeln!(writer, "{x} {y} {z}").unwrap();
-        }
     }
+}
+
+fn process_input_fields_tuple() {
+    let (reader, mut writer) = init_writer_reader("input_felder_5.txt");
+
+    for (line_index, line_content) in reader.lines().enumerate() {
+        let line_content = line_content.unwrap();
+        let mut playfield = EfficientPlayField::from_coded(&line_content);
+
+        let (x, y, z) = playfield.get_move_triple(PlayerColor::White);
+
+        assert!({
+            println!("Input {line_index}: {line_content}\n{playfield}");
+            println!("Moves: {x}\nMoves->Mill: {y}\nTo Take: {z}");
+            true
+        });
+
+        writeln!(writer, "{x} {y} {z}").unwrap();
+    }
+}
+
+/// Inits the reader and writer on the default files `input_felder.txt` and `output.txt`
+fn init_writer_reader(input: &str) -> (BufReader<File>, BufWriter<File>) {
+    let input_felder_txt =
+        File::open(input).expect("The 'input_felder.txt' file was not found in the projects root...");
+    let reader = BufReader::new(input_felder_txt);
+
+    let output_text = File::create("output.txt").expect("Could not create ro 'output.txt' to write results into");
+    let writer = BufWriter::new(output_text);
+
+    return (reader, writer);
 }
 
 #[cfg(test)]
@@ -486,12 +538,12 @@ mod tests {
 
     #[test]
     fn assignment4() {
-        super::process_input_felder(super::ToWhatToProcess::CanonicalForm);
+        super::process_input_fields_canonical();
     }
 
     #[test]
     fn assignment5() {
-        super::process_input_felder(super::ToWhatToProcess::MoveTripel);
+        super::process_input_fields_tuple();
     }
 
     #[test]
@@ -508,21 +560,21 @@ mod tests {
         fn set_field_normal() {
             let mut epf = EfficientPlayField::default();
 
-            epf.set_field(2, 7, 2); // ring 2, index 7, to black
-            epf.set_field(1, 7, 1); // ring 1, index 7, to white
-            epf.set_field(0, 7, 1); // ring 0, index 7, to white
+            epf.set_field_state(2, 7, 2); // ring 2, index 7, to black
+            epf.set_field_state(1, 7, 1); // ring 1, index 7, to white
+            epf.set_field_state(0, 7, 1); // ring 0, index 7, to white
 
-            epf.set_field(1, 0, 2); // ring 1, index 0, to black
-            epf.set_field(1, 1, 2); // ring 1, index 1, to black
-            epf.set_field(1, 2, 2); // ring 1, index 2, to black
-            epf.set_field(1, 3, 2); // ring 1, index 3, to black
-            epf.set_field(1, 4, 2); // ring 1, index 4, to black
-            epf.set_field(1, 5, 2); // ring 1, index 5, to black
-            epf.set_field(1, 6, 2); // ring 1, index 6, to black
+            epf.set_field_state(1, 0, 2); // ring 1, index 0, to black
+            epf.set_field_state(1, 1, 2); // ring 1, index 1, to black
+            epf.set_field_state(1, 2, 2); // ring 1, index 2, to black
+            epf.set_field_state(1, 3, 2); // ring 1, index 3, to black
+            epf.set_field_state(1, 4, 2); // ring 1, index 4, to black
+            epf.set_field_state(1, 5, 2); // ring 1, index 5, to black
+            epf.set_field_state(1, 6, 2); // ring 1, index 6, to black
 
-            epf.set_field(0, 6, 2); // ring 1, index 6, to black
-            epf.set_field(2, 2, 2); // ring 1, index 6, to black
-            epf.set_field(2, 4, 1); // ring 1, index 6, to black
+            epf.set_field_state(0, 6, 2); // ring 1, index 6, to black
+            epf.set_field_state(2, 2, 2); // ring 1, index 6, to black
+            epf.set_field_state(2, 4, 1); // ring 1, index 6, to black
 
             println!("\nAfter some added stones: {}", epf);
         }
@@ -531,9 +583,9 @@ mod tests {
         fn rotate1() {
             let mut epf = EfficientPlayField::default();
 
-            epf.set_field(2, 0, 1);
-            epf.set_field(1, 1, 2);
-            epf.set_field(0, 2, 1);
+            epf.set_field_state(2, 0, 1);
+            epf.set_field_state(1, 1, 2);
+            epf.set_field_state(0, 2, 1);
 
             println!("\nInitial state: {}", epf);
             epf.rotate_self_right(1);
@@ -560,10 +612,10 @@ mod tests {
         fn mirror1() {
             let mut epf = EfficientPlayField::default();
 
-            epf.set_field(2, 0, 1);
-            epf.set_field(1, 1, 2);
-            epf.set_field(0, 2, 1);
-            epf.set_field(2, 3, 2);
+            epf.set_field_state(2, 0, 1);
+            epf.set_field_state(1, 1, 2);
+            epf.set_field_state(0, 2, 1);
+            epf.set_field_state(2, 3, 2);
 
             println!("\nNot mirrored:{}", epf);
 
@@ -595,8 +647,8 @@ mod tests {
         fn set_field_black_to_white() {
             let mut epf = EfficientPlayField::default();
 
-            epf.set_field(2, 7, 2); // ring 2, index 7, to black
-            epf.set_field(2, 7, 2); // ring 2, index 7, to white
+            epf.set_field_state(2, 7, 2); // ring 2, index 7, to black
+            epf.set_field_state(2, 7, 2); // ring 2, index 7, to white
         }
 
         #[test]
@@ -604,8 +656,8 @@ mod tests {
         fn set_field_white_to_black() {
             let mut epf = EfficientPlayField::default();
 
-            epf.set_field(2, 7, 1); // ring 2, index 7, to white
-            epf.set_field(2, 7, 2); // ring 2, index 7, to black
+            epf.set_field_state(2, 7, 1); // ring 2, index 7, to white
+            epf.set_field_state(2, 7, 2); // ring 2, index 7, to black
         }
 
         #[test]
@@ -613,7 +665,7 @@ mod tests {
         fn set_field_free_to_free() {
             let mut epf = EfficientPlayField::default();
 
-            epf.set_field(1, 3, 0); // ring 1, index 3, to white
+            epf.set_field_state(1, 3, 0); // ring 1, index 3, to white
         }
 
         #[test]
@@ -621,7 +673,7 @@ mod tests {
         fn set_field_to_11() {
             let mut epf = EfficientPlayField::default();
 
-            epf.set_field(1, 3, 4); // ring 1, index 3, to undefined
+            epf.set_field_state(1, 3, 4); // ring 1, index 3, to undefined
         }
 
         #[test]
@@ -629,7 +681,7 @@ mod tests {
         fn set_ring_index_to_11() {
             let mut epf = EfficientPlayField::default();
 
-            epf.set_field(3, 1, 2); // ring ?, index 1, to black
+            epf.set_field_state(3, 1, 2); // ring ?, index 1, to black
         }
     }
 }

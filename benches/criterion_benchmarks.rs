@@ -16,7 +16,7 @@ fn make_playfield_random(pf: &mut EfficientPlayField) {
                 _ => panic!(),
             };
 
-            pf.set_field(i, j, randome_number);
+            pf.set_field_state(i, j, randome_number);
         }
     }
 }

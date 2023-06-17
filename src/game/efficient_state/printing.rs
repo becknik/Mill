@@ -9,9 +9,9 @@ impl Display for EfficientPlayField {
         f.write_str("\n")?;
 
         let (a, b, c) = (
-            self.get_field_state_as_char(2, 7),
-            self.get_field_state_as_char(2, 0),
-            self.get_field_state_as_char(2, 1),
+            self.get_field_state_char(2, 7),
+            self.get_field_state_char(2, 0),
+            self.get_field_state_char(2, 1),
         );
         writeln!(f, "\t{}|  {}------------{}------------{}", row_counter, a, b, c)?;
 
@@ -19,9 +19,9 @@ impl Display for EfficientPlayField {
         f.write_str("\t |  |            |            |\n")?;
 
         let (a, b, c) = (
-            self.get_field_state_as_char(1, 7),
-            self.get_field_state_as_char(1, 0),
-            self.get_field_state_as_char(1, 1),
+            self.get_field_state_char(1, 7),
+            self.get_field_state_char(1, 0),
+            self.get_field_state_char(1, 1),
         );
         writeln!(f, "\t{}|  |   {}--------{}--------{}   |", row_counter, a, b, c)?;
         row_counter -= 1;
@@ -29,9 +29,9 @@ impl Display for EfficientPlayField {
         f.write_str("\t |  |   |        |        |   |\n")?;
 
         let (a, b, c) = (
-            self.get_field_state_as_char(0, 7),
-            self.get_field_state_as_char(0, 0),
-            self.get_field_state_as_char(0, 1),
+            self.get_field_state_char(0, 7),
+            self.get_field_state_char(0, 0),
+            self.get_field_state_char(0, 1),
         );
         writeln!(f, "\t{}|  |   |   {}----{}----{}   |   |", row_counter, a, b, c)?;
         row_counter -= 1;
@@ -39,16 +39,16 @@ impl Display for EfficientPlayField {
         f.write_str("\t |  |   |   |         |   |   |\n")?;
 
         let (a, b, c) = (
-            self.get_field_state_as_char(2, 6),
-            self.get_field_state_as_char(1, 6),
-            self.get_field_state_as_char(0, 6),
+            self.get_field_state_char(2, 6),
+            self.get_field_state_char(1, 6),
+            self.get_field_state_char(0, 6),
         );
         write!(f, "\t{}|  {}---{}---{}", row_counter, a, b, c)?;
 
         let (a, b, c) = (
-            self.get_field_state_as_char(0, 2),
-            self.get_field_state_as_char(1, 2),
-            self.get_field_state_as_char(2, 2),
+            self.get_field_state_char(0, 2),
+            self.get_field_state_char(1, 2),
+            self.get_field_state_char(2, 2),
         );
         writeln!(f, "         {}---{}---{}", a, b, c)?;
         row_counter -= 1;
@@ -56,9 +56,9 @@ impl Display for EfficientPlayField {
         f.write_str("\t |  |   |   |         |   |   |\n")?;
 
         let (a, b, c) = (
-            self.get_field_state_as_char(0, 5),
-            self.get_field_state_as_char(0, 4),
-            self.get_field_state_as_char(0, 3),
+            self.get_field_state_char(0, 5),
+            self.get_field_state_char(0, 4),
+            self.get_field_state_char(0, 3),
         );
         writeln!(f, "\t{}|  |   |   {}----{}----{}   |   |", row_counter, a, b, c)?;
         row_counter -= 1;
@@ -66,9 +66,9 @@ impl Display for EfficientPlayField {
         f.write_str("\t |  |   |        |        |   |\n")?;
 
         let (a, b, c) = (
-            self.get_field_state_as_char(1, 5),
-            self.get_field_state_as_char(1, 4),
-            self.get_field_state_as_char(1, 3),
+            self.get_field_state_char(1, 5),
+            self.get_field_state_char(1, 4),
+            self.get_field_state_char(1, 3),
         );
         writeln!(f, "\t{}|  |   {}--------{}--------{}   |", row_counter, a, b, c)?;
         row_counter -= 1;
@@ -76,9 +76,9 @@ impl Display for EfficientPlayField {
         f.write_str("\t |  |            |            |\n")?;
 
         let (a, b, c) = (
-            self.get_field_state_as_char(2, 5),
-            self.get_field_state_as_char(2, 4),
-            self.get_field_state_as_char(2, 3),
+            self.get_field_state_char(2, 5),
+            self.get_field_state_char(2, 4),
+            self.get_field_state_char(2, 3),
         );
         writeln!(f, "\t{}|  {}------------{}------------{}", row_counter, a, b, c)?;
 
@@ -94,7 +94,7 @@ impl Display for EfficientPlayField {
 
 impl EfficientPlayField {
     /// Converts the state of the specified index to a char (00 to '·', 01 to '●' & 10 to '○')
-    fn get_field_state_as_char(&self, ring_index: usize, index: u32) -> char {
+    fn get_field_state_char(&self, ring_index: usize, index: u32) -> char {
         match ((self.state[ring_index] & (3u16 << (index * 2))) >> (index * 2)) as u16 {
             0u16 => '·',
             1u16 => '●',

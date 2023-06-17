@@ -475,21 +475,21 @@ impl EfficientPlayField {
         let mut muehle_placement_playfield = Vec::<EfficientPlayField>::new();
 
         let mut template_1 = EfficientPlayField::default();
-        template_1.set_field(2, 7, 1);
-        template_1.set_field(2, 0, 1);
-        template_1.set_field(2, 1, 1);
+        template_1.set_field_state(2, 7, 1);
+        template_1.set_field_state(2, 0, 1);
+        template_1.set_field_state(2, 1, 1);
         muehle_placement_playfield.push(template_1);
 
         let mut template_2 = EfficientPlayField::default();
-        template_2.set_field(1, 7, 1);
-        template_2.set_field(1, 0, 1);
-        template_2.set_field(1, 1, 1);
+        template_2.set_field_state(1, 7, 1);
+        template_2.set_field_state(1, 0, 1);
+        template_2.set_field_state(1, 1, 1);
         muehle_placement_playfield.push(template_2);
 
         let mut template_3 = EfficientPlayField::default();
-        template_3.set_field(2, 0, 1);
-        template_3.set_field(1, 0, 1);
-        template_3.set_field(0, 0, 1);
+        template_3.set_field_state(2, 0, 1);
+        template_3.set_field_state(1, 0, 1);
+        template_3.set_field_state(0, 0, 1);
         muehle_placement_playfield.push(template_3);
 
         muehle_placement_playfield
@@ -725,7 +725,8 @@ impl EfficientPlayField {
             set.insert(self.clone().get_canonical_form());
 
             // if there are leftovers, all possible placements are done and added to the set
-            let left_overs = 0.max(max_stone_count as i32 - amount_of_white_moves as i32 - black_mill_count as i32) as usize;
+            let left_overs =
+                0.max(max_stone_count as i32 - amount_of_white_moves as i32 - black_mill_count as i32) as usize;
 
             self.place_stones_across_playfield(PlayerColor::White, left_overs, 0, set);
         }
