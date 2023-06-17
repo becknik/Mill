@@ -5,7 +5,9 @@
 
 use std::{
     fs::File,
-    io::{BufRead, BufReader, BufWriter, Write}, hash::{Hash, Hasher},
+    hash::{Hash, Hasher},
+    io::{BufRead, BufReader, BufWriter, Write},
+    process::id,
 };
 
 use super::PlayerColor;
@@ -30,6 +32,11 @@ pub struct EfficientPlayField {
     state: [u16; 3],
 }
 
+struct FieldPos {
+    ring_index: usize,
+    field_index: u16,
+}
+
 impl Hash for EfficientPlayField {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.state.hash(state)
@@ -44,6 +51,7 @@ enum RelativePosition {
     Previous,
     Next,
 }
+use smallvec::SmallVec;
 use RelativePosition::*;
 
 impl EfficientPlayField {
@@ -226,13 +234,65 @@ impl EfficientPlayField {
     /// It is possibly used as a judging function for the player agent
     //#[inline]
     pub fn get_move_triple(&mut self, color: PlayerColor) -> (u32, u32, u32) {
-        let mut moves_possible_counter = 0;
-        let mut moves_to_mill_counter = 0;
-        let mut stones_to_take_counter = 0;
+        let mut moves_possible_counter: u32 = 0;
+        let mut moves_into_mill_counter: u32 = 0;
+        let mut stones_to_take_counter: u32 = 0;
 
         // Used for the extreme case when all stones of the opponent are in a mill
         let mut overall_stones_of_opposite_color_counter = 0;
 
+        let (color_positions, not_color_positions) = self.get_positions(color);
+        if color_positions.len() == 3 {
+            moves_possible_counter = 3 * not_color_positions.len() as u32;
+            stones_to_take_counter = not_color_positions.len() as u32;
+
+            for position in not_color_positions {
+                if 0 < self.get_mill_count( position.ring_index, position.field_index, DirectionToCheck::OnAndAcrossRings { player_color: (!color).into() }) {
+                    stones_to_take_counter -= 1;
+                }
+            }
+
+            if (color_positions[0].ring_index == color_positions[1].ring_index
+                && color_positions[1].ring_index != color_positions[2].ring_index)
+                || (color_positions[0].ring_index != color_positions[1].ring_index
+                    && color_positions[1].ring_index == color_positions[2].ring_index)
+                || (color_positions[0].ring_index == color_positions[2].ring_index
+                    && color_positions[0].ring_index != color_positions[1].ring_index)
+                || (color_positions[0].field_index == color_positions[1].field_index
+                    && color_positions[1].field_index != color_positions[2].field_index)
+                || (color_positions[0].field_index != color_positions[1].field_index
+                    && color_positions[1].field_index == color_positions[2].field_index)
+                || (color_positions[0].field_index == color_positions[2].field_index
+                    && color_positions[0].field_index != color_positions[1].field_index)
+            {
+                moves_into_mill_counter += 1;
+            }
+        } else {
+            self.calculate_move_tupel(
+                color,
+                &mut moves_possible_counter,
+                &mut moves_into_mill_counter,
+                &mut overall_stones_of_opposite_color_counter,
+                &mut stones_to_take_counter,
+            );
+
+            if stones_to_take_counter == 0 {
+                // All stones of the opposite color are in a mill:
+                stones_to_take_counter = overall_stones_of_opposite_color_counter;
+            }
+        }
+
+        (moves_possible_counter, moves_into_mill_counter, stones_to_take_counter)
+    }
+
+    fn calculate_move_tupel(
+        &mut self,
+        color: PlayerColor,
+        moves_possible_counter: &mut u32,
+        moves_into_mill_counter: &mut u32,
+        overall_stones_of_opposite_color_counter: &mut u32,
+        stones_to_take_counter: &mut u32,
+    ) {
         for ring_index in 0..3 {
             for field_index in 0..8 {
                 // Current field state sifted to the LSB
@@ -247,9 +307,9 @@ impl EfficientPlayField {
                 if current_field_state == color.into() {
                     for (neighbor_index, neighbor_state) in self.get_neighbor_field_states(ring_index, field_index) {
                         if neighbor_state == 0 {
-                            moves_possible_counter += 1;
+                            *moves_possible_counter += 1;
 
-                            moves_to_mill_counter += self.simulate_move_get_mill_count(
+                            *moves_into_mill_counter += self.simulate_move_get_mill_count(
                                 ring_index,
                                 field_index,
                                 MoveDirection::OnRing {
@@ -259,69 +319,18 @@ impl EfficientPlayField {
                             );
                         }
                     }
-
                     // Check for possible over-ring moves
                     if (field_index % 2) == 0 {
-                        let next_rings_field_state =
-                            self.get_field_state_at(Self::get_ring_index(ring_index, Next), field_index, false);
-                        let previous_rings_field_state =
-                            self.get_field_state_at(Self::get_ring_index(ring_index, Previous), field_index, false);
+                        let (a, b) = self.calculate_tupels_across_rings(ring_index, field_index, color);
 
-                        match ring_index {
-                            // Inner Ring
-                            0 if next_rings_field_state == 0 => {
-                                moves_possible_counter += 1;
-
-                                moves_to_mill_counter += self.simulate_move_get_mill_count(
-                                    0,
-                                    field_index,
-                                    MoveDirection::AcrossRings { target_ring_index: 1 },
-                                    current_field_state,
-                                )
-                            }
-                            // Mid Ring
-                            1 => {
-                                if previous_rings_field_state == 0 {
-                                    moves_possible_counter += 1;
-
-                                    moves_to_mill_counter += self.simulate_move_get_mill_count(
-                                        1,
-                                        field_index,
-                                        MoveDirection::AcrossRings { target_ring_index: 0 },
-                                        current_field_state,
-                                    )
-                                }
-
-                                if next_rings_field_state == 0 {
-                                    moves_possible_counter += 1;
-
-                                    moves_to_mill_counter += self.simulate_move_get_mill_count(
-                                        1,
-                                        field_index,
-                                        MoveDirection::AcrossRings { target_ring_index: 2 },
-                                        current_field_state,
-                                    )
-                                }
-                            }
-                            // Outer Ring
-                            2 if previous_rings_field_state == 0 => {
-                                moves_possible_counter += 1;
-
-                                moves_to_mill_counter += self.simulate_move_get_mill_count(
-                                    2,
-                                    field_index,
-                                    MoveDirection::AcrossRings { target_ring_index: 1 },
-                                    current_field_state,
-                                )
-                            }
-                            _ => {}
-                        }
+                        *moves_possible_counter += a;
+                        *moves_into_mill_counter += b;
                     }
                 }
                 // The opposite colors amount of stones which can be taken should be counted, which is if the stone
                 // Isn't inside a mill!
                 else {
-                    overall_stones_of_opposite_color_counter += 1;
+                    *overall_stones_of_opposite_color_counter += 1;
 
                     if self.get_mill_count(
                         ring_index,
@@ -331,18 +340,99 @@ impl EfficientPlayField {
                         },
                     ) == 0
                     {
-                        stones_to_take_counter += 1;
+                        *stones_to_take_counter += 1;
                     }
                 }
             }
         }
+    }
 
-        if stones_to_take_counter == 0 {
-            // All stones of the opposite color are in a mill:
-            stones_to_take_counter = overall_stones_of_opposite_color_counter;
+    /// Calculates the moves possible and moves into a mill when a stones is movable across EfficientPlayField rings.
+    /// Returns (moves_possible_counter, moves_into_mill_counter)
+    fn calculate_tupels_across_rings(&mut self, ring_index: usize, field_index: u16, color: PlayerColor) -> (u32, u32) {
+        let mut moves_possible_counter = 0;
+        let mut moves_into_mill_counter = 0;
+
+        let next_rings_field_state =
+            self.get_field_state_at(Self::get_ring_index(ring_index, Next), field_index, false);
+        let previous_rings_field_state =
+            self.get_field_state_at(Self::get_ring_index(ring_index, Previous), field_index, false);
+
+        match ring_index {
+            // Inner Ring
+            0 if next_rings_field_state == 0 => {
+                moves_possible_counter += 1;
+
+                moves_into_mill_counter += self.simulate_move_get_mill_count(
+                    0,
+                    field_index,
+                    MoveDirection::AcrossRings { target_ring_index: 1 },
+                    color.into(),
+                )
+            }
+            // Mid Ring
+            1 => {
+                if previous_rings_field_state == 0 {
+                    moves_possible_counter += 1;
+
+                    moves_into_mill_counter += self.simulate_move_get_mill_count(
+                        1,
+                        field_index,
+                        MoveDirection::AcrossRings { target_ring_index: 0 },
+                        color.into(),
+                    )
+                }
+
+                if next_rings_field_state == 0 {
+                    moves_possible_counter += 1;
+
+                    moves_into_mill_counter += self.simulate_move_get_mill_count(
+                        1,
+                        field_index,
+                        MoveDirection::AcrossRings { target_ring_index: 2 },
+                        color.into(),
+                    )
+                }
+            }
+            // Outer Ring
+            2 if previous_rings_field_state == 0 => {
+                moves_possible_counter += 1;
+
+                moves_into_mill_counter += self.simulate_move_get_mill_count(
+                    2,
+                    field_index,
+                    MoveDirection::AcrossRings { target_ring_index: 1 },
+                    color.into(),
+                )
+            }
+            _ => {}
         }
 
-        (moves_possible_counter, moves_to_mill_counter, stones_to_take_counter)
+        return (moves_possible_counter, moves_into_mill_counter);
+    }
+
+    fn get_positions(&self, color: PlayerColor) -> (SmallVec<[FieldPos; 9]>, SmallVec<[FieldPos; 9]>) {
+        let mut color_positions = SmallVec::<[FieldPos; 9]>::default();
+        let mut not_color_positions = SmallVec::<[FieldPos; 9]>::default();
+
+        for ring_index in 0..3 {
+            for field_index in 0..8 {
+                let state = self.get_field_state_at(ring_index, field_index, true);
+                if state == color.into() {
+                    color_positions.push(FieldPos {
+                        ring_index,
+                        field_index,
+                    })
+                } else if state == (!color).into() {
+                    color_positions.push(FieldPos {
+                        ring_index,
+                        field_index,
+                    })
+                }
+            }
+        }
+
+        (color_positions, not_color_positions)
     }
 
     /// Simulates a move of the stones of the start fields and ring index to either a it's neighboring target index or
@@ -456,8 +546,7 @@ impl EfficientPlayField {
                     self.get_field_state_at(Self::get_ring_index(ring_index, Previous), field_index, true);
 
                 // Mill in between rings:
-                if next_rindex_field_state == player_color && next_rindex_field_state == previous_rindex_field_state
-                {
+                if next_rindex_field_state == player_color && next_rindex_field_state == previous_rindex_field_state {
                     mill_counter += 1;
                 }
             }
@@ -548,9 +637,12 @@ mod tests {
 
     #[test]
     fn assignment5_dbg() {
-        let mut test_epf = EfficientPlayField::from_coded("BEEEWEWBEEWWEEWEWEEWWWBB");
+        //let mut test_epf = EfficientPlayField::from_coded("BEEEWEWBEEWWEEWEWEEWWWBB");
+        let mut test_epf = EfficientPlayField::from_coded("EWWBBEEEEEWBBEEEEEEEBEEB");
+        println!("{test_epf}");
 
-        test_epf.get_move_triple(crate::game::PlayerColor::White);
+        let (x, y, z) = test_epf.get_move_triple(crate::game::PlayerColor::White);
+        println!("{x} {y} {z}")
     }
 
     mod normal {
