@@ -1223,6 +1223,12 @@ mod tests {
 
     #[test]
     fn test_generate_all_won_playfields_5() {
+        let won_set = EfficientPlayField::generate_all_won_playfields(5);
+        println!("{}", won_set.len());
+    }
+
+    #[test]
+    fn test_input_game_state_decider_5() {
         EfficientPlayField::input_game_state_decider(5);
     }
 }
