@@ -247,7 +247,13 @@ impl EfficientPlayField {
             stones_to_take_counter = not_color_positions.len() as u32;
 
             for position in not_color_positions {
-                if 0 < self.get_mill_count( position.ring_index, position.field_index, DirectionToCheck::OnAndAcrossRings { player_color: (!color).into() }) {
+                if 0 < self.get_mill_count(
+                    position.ring_index,
+                    position.field_index,
+                    DirectionToCheck::OnAndAcrossRings {
+                        player_color: (!color).into(),
+                    },
+                ) {
                     stones_to_take_counter -= 1;
                 }
             }

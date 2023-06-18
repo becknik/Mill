@@ -29,7 +29,7 @@ impl EfficientPlayField {
 
                 if 0 == self.get_mill_count(
                     ring_index,
-                    field_index,
+                    field_index / 2, //hier
                     DirectionToCheck::OnAndAcrossRings {
                         player_color: player_color.into(),
                     },
@@ -73,7 +73,9 @@ impl EfficientPlayField {
             // Setting the state of the other index, which must be empty
             self.state[target_ring_index] |= color << start_fields_index;
 
-            let mills_possible = self.get_mill_count(target_ring_index, start_fields_index, DirectionToCheck::OnRing);
+            //hier
+            let mills_possible =
+                self.get_mill_count(target_ring_index, start_fields_index / 2, DirectionToCheck::OnRing);
 
             // If mill ocurrs, take all stones possible which is specified in fields_to_take
             if 0 < mills_possible {
@@ -100,7 +102,7 @@ impl EfficientPlayField {
             // Check for mills after the move now has taken place
             let mills_possible = self.get_mill_count(
                 start_ring_index,
-                target_field_index,
+                target_field_index / 2, //hier
                 DirectionToCheck::OnAndAcrossRings { player_color: color },
             );
 
@@ -249,7 +251,7 @@ impl EfficientPlayField {
         // Check for mills before the move has taken place
         let was_in_mill = self.get_mill_count(
             start_ring_index,
-            start_fields_index,
+            start_fields_index / 2, //hier
             DirectionToCheck::OnAndAcrossRings {
                 player_color: stone_color,
             },
@@ -380,7 +382,7 @@ impl EfficientPlayField {
                             let mut current_move_playfields = self.simulate_backward_move_get_playfields(
                                 &fields_to_place,
                                 ring_index,
-                                field_index,
+                                field_index, // hier geteilt 2
                                 MoveDirection::OnRing {
                                     target_field_index: neighbor_index,
                                 },
@@ -741,7 +743,8 @@ impl EfficientPlayField {
         for ring_index in 0..3 {
             for field_index in 0..8 {
                 if field_index % 2 == 0 {
-                    mill_count += self.get_mill_count(ring_index, field_index * 2, DirectionToCheck::OnRing) as usize;
+                    //hier
+                    mill_count += self.get_mill_count(ring_index, field_index, DirectionToCheck::OnRing) as usize;
 
                     let current_even_index_state = (self.state[ring_index] << (field_index * 2)) >> (field_index * 2);
 
