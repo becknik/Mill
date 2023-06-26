@@ -119,9 +119,9 @@ impl EfficientPlayField {
                     _ => {}
                 }
             }
-            output_string.push('\n');
+            //output_string.push('\n');
         }
-        output_string.push('\n');
+        //output_string.push('\n');
 
         output_string
     }

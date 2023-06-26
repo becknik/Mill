@@ -2,105 +2,78 @@ use std::{
     collections::HashSet,
     collections::VecDeque,
     fs::File,
-    io::{BufRead, BufReader, BufWriter, Write},
+    io::{stdout, BufRead, BufReader, BufWriter, Write},
 };
+
+use smallvec::SmallVec;
 
 use super::DirectionToCheck;
 use super::EfficientPlayField;
 use super::MoveDirection;
 use crate::game::PlayerColor;
 
+const TO_TAKE_VEC_SIZE: usize = 64;
+
 impl EfficientPlayField {
-    // nur für optimierung
-    fn get_fields_to_place_and_stone_amount(&self, player_color: PlayerColor) -> (Vec<(usize, u16)>, usize) {
-        let mut empty_fields_to_place_bitmasks = Vec::<(usize, u16)>::new();
+    /// Counts & returns the amount of stones on the whole plazfield
+    fn get_stone_count(&self, player_color: PlayerColor) -> usize {
         let mut stone_counter = 0;
 
         for ring_index in 0..3 {
-            for field_index in (0..16).step_by(2) {
-                let current_field_state = (self.state[ring_index] & (3u16 << field_index)) >> field_index;
+            for field_index in 0..8 {
+                let current_field_state = self.get_field_state_at(ring_index, field_index, true);
 
-                if current_field_state == <PlayerColor as Into<u16>>::into(player_color) {
-                    stone_counter += 1;
-                }
-
-                if current_field_state != 0 {
-                    continue;
-                }
-
-                let future_field_state: u16 = <PlayerColor as Into<u16>>::into(player_color) << field_index;
-                empty_fields_to_place_bitmasks.push((ring_index, future_field_state));
-            }
-        }
-
-        (empty_fields_to_place_bitmasks, stone_counter)
-    }
-
-    fn get_amount_of_stones(&self, player_color: PlayerColor) -> usize {
-        let mut stone_counter = 0;
-
-        for ring_index in 0..3 {
-            for field_index in (0..16).step_by(2) {
-                let current_field_state = (self.state[ring_index] & (3u16 << field_index)) >> field_index;
-
-                if current_field_state == <PlayerColor as Into<u16>>::into(player_color) {
+                if current_field_state == player_color.into() {
                     stone_counter += 1;
                 }
             }
         }
-
         stone_counter
     }
 
     /// Returns the bit masks for the fields that can be taken by the player with player_color
-    fn get_fields_to_take(&self, player_color: PlayerColor) -> Vec<(usize, u16)> {
-        let mut all_stone_bitmasks = Vec::<(usize, u16)>::new();
-        let mut not_in_mill_bitsmasks = Vec::<(usize, u16)>::new();
+    fn get_fields_to_take(&self, player_color: PlayerColor) -> SmallVec<[(usize, u16); TO_TAKE_VEC_SIZE]> {
+        let mut bitmasks_of_current_color_stones = SmallVec::<[(usize, u16); TO_TAKE_VEC_SIZE]>::new();
+        let mut not_in_mill_bitsmasks = SmallVec::<[(usize, u16); TO_TAKE_VEC_SIZE]>::new();
 
         for ring_index in 0..3 {
-            for field_index in (0..16).step_by(2) {
-                let current_field_state = (self.state[ring_index] & (3u16 << field_index)) >> field_index;
+            for field_index in 0..8 {
+                let current_field_state = self.get_field_state_at(ring_index, field_index, true);
 
-                if current_field_state == 0 || current_field_state == <PlayerColor as Into<u16>>::into(!player_color) {
-                    continue;
-                }
+                if current_field_state == player_color.into() {
+                    let bit_mask = 3u16 << (field_index * 2);
+                    bitmasks_of_current_color_stones.push((ring_index, bit_mask));
 
-                let bit_mask = 3u16 << field_index;
-                all_stone_bitmasks.push((ring_index, bit_mask));
-
-                if 0 == self.get_mill_count(
-                    ring_index,
-                    field_index / 2, //hier
-                    DirectionToCheck::OnAndAcrossRings {
-                        player_color: player_color.into(),
-                    },
-                ) {
-                    not_in_mill_bitsmasks.push((ring_index, bit_mask));
+                    if 0 == self.get_mill_count(
+                        ring_index,
+                        field_index,
+                        DirectionToCheck::OnAndAcrossRings {
+                            player_color: player_color.into(),
+                        },
+                    ) {
+                        not_in_mill_bitsmasks.push((ring_index, bit_mask));
+                    }
                 }
             }
         }
 
         // If all stones are in mills, stones from mills can be taken
         if not_in_mill_bitsmasks.is_empty() {
-            all_stone_bitmasks
+            bitmasks_of_current_color_stones
         } else {
             not_in_mill_bitsmasks
         }
     }
 
-    /// Preconditions:
-    /// - Indices should already be in "representation form" (= 0 <= x < 16).step_by(2)
-    /// - The target field/ the start index on the other ring must be empty
-    fn simulate_moves(
+    fn simulate_all_possible_moves(
         &mut self,
         fields_to_take: &Vec<(usize, u16)>,
         start_ring_index: usize,
         start_fields_index: u16,
         direction: MoveDirection,
         color: u16,
-    ) -> Vec<EfficientPlayField> {
-        let mut simulated_playfields = Vec::<EfficientPlayField>::new();
-
+        simulated_playfield_configs: &mut Vec<EfficientPlayField>,
+    ) {
         // To rollback the in-situ changes on self
         let start_ring_backup = self.state[start_ring_index];
 
@@ -114,7 +87,6 @@ impl EfficientPlayField {
             // Setting the state of the other index, which must be empty
             self.state[target_ring_index] |= color << start_fields_index;
 
-            //hier
             let mills_possible =
                 self.get_mill_count(target_ring_index, start_fields_index / 2, DirectionToCheck::OnRing);
 
@@ -122,16 +94,16 @@ impl EfficientPlayField {
             if 0 < mills_possible {
                 let backup_after_first_move = self.state;
 
-                for field_and_bitmask in fields_to_take {
-                    self.state[field_and_bitmask.0] &= !field_and_bitmask.1;
-                    simulated_playfields.push(self.clone());
+                for (ring_index, bitmask_to_clear) in fields_to_take {
+                    self.state[*ring_index] &= !bitmask_to_clear;
+                    simulated_playfield_configs.push(self.clone());
 
                     self.state = backup_after_first_move;
                 }
             }
-            // No mills => just push simulated move
+            // No new mills => just push simulated move
             else {
-                simulated_playfields.push(self.clone());
+                simulated_playfield_configs.push(self.clone());
             }
 
             // Resetting the in-place simulation on the other ring
@@ -153,19 +125,17 @@ impl EfficientPlayField {
 
                 for field_and_bitmask in fields_to_take {
                     self.state[field_and_bitmask.0] &= !(field_and_bitmask.1);
-                    simulated_playfields.push(self.clone());
+                    simulated_playfield_configs.push(self.clone());
 
                     self.state = backup_after_first_move;
                 }
             } else {
-                simulated_playfields.push(self.clone());
+                simulated_playfield_configs.push(self.clone());
             }
         }
 
         // Resetting the in-place simulation
         self.state[start_ring_index] = start_ring_backup;
-
-        return simulated_playfields;
     }
 
     pub fn generate_forward_moves(&mut self, player_color: PlayerColor) -> Vec<EfficientPlayField> {
@@ -173,6 +143,7 @@ impl EfficientPlayField {
         let fields_to_take = self.get_fields_to_take(!player_color);
 
         let mut forward_moved_playfields = Vec::<EfficientPlayField>::new();
+        let mut simulated_playfield_buffer = Vec::<EfficientPlayField>::new();
 
         for ring_index in 0..3 {
             for field_index in (0..16).step_by(2) {
@@ -183,7 +154,7 @@ impl EfficientPlayField {
 
                 if current_field_state == player_color.into() {
                     // only 3 stones? -> jumps
-                    let amount_of_stones = self.get_amount_of_stones(player_color);
+                    let amount_of_stones = self.get_stone_count(player_color);
                     if amount_of_stones == 3 {
                         let backup_state = self.state;
                         self.state[ring_index] &= !(0x0003 << field_index);
@@ -229,16 +200,19 @@ impl EfficientPlayField {
                         let neighbors_indices_on_ring = [(field_index + 14) % 16, (field_index + 18) % 16];
                         for neighbor_index in neighbors_indices_on_ring {
                             if (self.state[ring_index] & (3u16 << neighbor_index)) == 0 {
-                                let mut current_move_playfields = self.simulate_moves(
-                                    &fields_to_take,
+                                self.simulate_all_possible_moves(
+                                    &fields_to_take.to_vec(),
                                     ring_index,
                                     field_index,
                                     MoveDirection::OnRing {
                                         target_field_index: neighbor_index,
                                     },
                                     current_field_state,
+                                    &mut simulated_playfield_buffer,
                                 );
-                                forward_moved_playfields.append(&mut current_move_playfields);
+
+                                forward_moved_playfields.append(&mut simulated_playfield_buffer);
+                                simulated_playfield_buffer.clear();
                             }
                         }
 
@@ -248,47 +222,55 @@ impl EfficientPlayField {
 
                             match ring_index {
                                 0 if next_rings_field_state == 0 => {
-                                    let mut current_move_playfields = self.simulate_moves(
-                                        &fields_to_take,
+                                    self.simulate_all_possible_moves(
+                                        &fields_to_take.to_vec(),
                                         0,
                                         field_index,
                                         MoveDirection::AcrossRings { target_ring_index: 1 },
                                         current_field_state,
+                                        &mut simulated_playfield_buffer,
                                     );
-                                    forward_moved_playfields.append(&mut current_move_playfields);
+                                    forward_moved_playfields.append(&mut simulated_playfield_buffer);
+                                    simulated_playfield_buffer.clear();
                                 }
                                 1 => {
                                     if previous_rings_field_state == 0 {
-                                        let mut current_move_playfields = self.simulate_moves(
-                                            &fields_to_take,
+                                        self.simulate_all_possible_moves(
+                                            &fields_to_take.to_vec(),
                                             1,
                                             field_index,
                                             MoveDirection::AcrossRings { target_ring_index: 0 },
                                             current_field_state,
+                                            &mut simulated_playfield_buffer,
                                         );
-                                        forward_moved_playfields.append(&mut current_move_playfields);
+                                        forward_moved_playfields.append(&mut simulated_playfield_buffer);
+                                        simulated_playfield_buffer.clear();
                                     }
 
                                     if next_rings_field_state == 0 {
-                                        let mut current_move_playfields = self.simulate_moves(
-                                            &fields_to_take,
+                                        self.simulate_all_possible_moves(
+                                            &fields_to_take.to_vec(),
                                             1,
                                             field_index,
                                             MoveDirection::AcrossRings { target_ring_index: 2 },
                                             current_field_state,
+                                            &mut simulated_playfield_buffer,
                                         );
-                                        forward_moved_playfields.append(&mut current_move_playfields);
+                                        forward_moved_playfields.append(&mut simulated_playfield_buffer);
+                                        simulated_playfield_buffer.clear();
                                     }
                                 }
                                 2 if previous_rings_field_state == 0 => {
-                                    let mut current_move_playfields = self.simulate_moves(
-                                        &fields_to_take,
+                                    self.simulate_all_possible_moves(
+                                        &fields_to_take.to_vec(),
                                         2,
                                         field_index,
                                         MoveDirection::AcrossRings { target_ring_index: 1 },
                                         current_field_state,
+                                        &mut simulated_playfield_buffer,
                                     );
-                                    forward_moved_playfields.append(&mut current_move_playfields);
+                                    forward_moved_playfields.append(&mut simulated_playfield_buffer);
+                                    simulated_playfield_buffer.clear();
                                 }
                                 _ => {}
                             }
@@ -462,7 +444,7 @@ impl EfficientPlayField {
 
                 // In this branch the current colors possible moves & => movements into a mill should be figured out
                 if current_field_state == player_color.into() {
-                    let amount_of_stones = self.get_amount_of_stones(player_color);
+                    let amount_of_stones = self.get_stone_count(player_color);
                     if amount_of_stones == 3 {
                         // Check for mills before the move has taken place
                         let was_in_mill = self.get_mill_count(
@@ -487,11 +469,45 @@ impl EfficientPlayField {
                             if 0 < was_in_mill {
                                 let fields_to_place_taken_stone = clone.get_fields_to_place(!player_color);
 
-                                for replacement in fields_to_place_taken_stone {
+                                for mut replacement in fields_to_place_taken_stone {
                                     if !(ring_index == replacement.0 && replacement.1 & (0x0003 << field_index) != 0) {
                                         let mut clone_2 = clone.clone();
 
                                         clone_2.state[replacement.0] |= replacement.1;
+
+                                        //TODO
+                                        /* let mut stones_not_in_mill = 0;
+                                        for ring_index in 0..3 {
+                                            for field_index in 0..8 {
+                                                if 0 == clone_2.get_mill_count(ring_index, field_index, DirectionToCheck::OnAndAcrossRings { player_color: (!player_color).into()}) {
+                                                    stones_not_in_mill += 1;
+                                                }
+                                            }
+                                        }
+
+                                        let mut new_field_index = 0;
+
+                                        while replacement.1 != 0 {
+                                            replacement.1 = replacement.1 >> 2;
+                                            new_field_index += 1;
+                                        }
+                                        new_field_index -= 1;
+
+                                        let mills_possible = clone_2.get_mill_count(
+                                            replacement.0,
+                                            new_field_index,
+                                            DirectionToCheck::OnAndAcrossRings {
+                                                player_color: (!player_color).into(),
+                                            },
+                                        );
+
+                                        if stones_not_in_mill > 0 {
+                                            if mills_possible == 0 {
+                                                output_playfields.push(clone_2.clone());
+                                            }
+                                        } else {
+                                            output_playfields.push(clone_2.clone());
+                                        } */
 
                                         //wenn alle steine in mühle -> push
                                         //wenn nicht
@@ -1052,7 +1068,9 @@ impl EfficientPlayField {
         output_placements
     }
 
-    pub fn generate_all_won_playfields(max_stone_count: usize) -> HashSet<EfficientPlayField> {
+    pub fn generate_all_won_playfields(
+        max_stone_count: usize,
+    ) -> (HashSet<EfficientPlayField>, HashSet<EfficientPlayField>) {
         let mut won_set = EfficientPlayField::generate_white_won_configurations(max_stone_count);
         EfficientPlayField::add_white_won_configurations_enclosed(max_stone_count, &mut won_set);
         println!("> Created WON set containing {} elements", won_set.len());
@@ -1065,19 +1083,33 @@ impl EfficientPlayField {
         }
         println!("> Pushed WON sets elements onto queue");
 
+        // generates lost_set for white
+        let mut lost_set = HashSet::<EfficientPlayField>::new();
+
         // Indicator for who moved last: even => white made last move
         //let mut path_depth: usize = 0;
 
-        while let Some((reverse_level, mut current)) = work_queue.pop_front() {
-            // White moved last
-            if reverse_level % 2 == 0 {
-                // Every backward move is going to be added:
-                for mut backward_playfield in current.get_backward_moves(PlayerColor::White) {
-                    backward_playfield = backward_playfield.get_canonical_form();
+        let mut counter = 0;
+        while let Some((tree_level_bottom_up, mut current)) = work_queue.pop_front() {
+            counter += 1;
+            if counter % 1_000 == 0 {
+                println!(
+                    "Bottom up niveau: {tree_level_bottom_up}\nWON length: {} --- LOST length: {}\nQueue length: {}",
+                    won_set.len(),
+                    lost_set.len(),
+                    work_queue.len()
+                );
+            }
 
-                    if !won_set.contains(&backward_playfield) {
-                        won_set.insert(backward_playfield);
-                        work_queue.push_back((reverse_level + 1, backward_playfield));
+            // White moved last
+            if tree_level_bottom_up % 2 == 0 {
+                // Every backward move is going to be added:
+                for mut backward_move_config in current.get_backward_moves(PlayerColor::White) {
+                    backward_move_config = backward_move_config.get_canonical_form();
+
+                    if !won_set.contains(&backward_move_config) {
+                        won_set.insert(backward_move_config);
+                        work_queue.push_back((tree_level_bottom_up + 1, backward_move_config));
                     }
                 }
             }
@@ -1085,47 +1117,42 @@ impl EfficientPlayField {
             else {
                 for mut backward_playfield in current.get_backward_moves(PlayerColor::Black) {
                     let mut all_forward_moves_in_won = true;
+                    backward_playfield = backward_playfield.get_canonical_form();
 
-                    for forward_playfield in backward_playfield.generate_forward_moves(PlayerColor::Black) {
+                    for mut forward_playfield in backward_playfield.generate_forward_moves(PlayerColor::Black) {
+                        forward_playfield = forward_playfield.get_canonical_form();
                         if !won_set.contains(&forward_playfield) {
                             all_forward_moves_in_won = false;
                         }
                     }
 
-                    // Adds the backward_playfield to the sets / work_stack and removes the current worked on element from the stack
+                    // Adds the inverted backward_playfield to lost_set
                     if all_forward_moves_in_won {
-                        backward_playfield = backward_playfield.get_canonical_form();
+                        let insert_playfield = backward_playfield.invert_playfields_stone_colors().get_canonical_form();
 
-                        if !won_set.contains(&backward_playfield) {
-                            won_set.insert(backward_playfield);
-                            work_queue.push_back((reverse_level + 1, backward_playfield));
+                        if !lost_set.contains(&insert_playfield) {
+                            lost_set.insert(insert_playfield);
+                            work_queue.push_back((tree_level_bottom_up + 1, backward_playfield));
                         }
                     }
                 }
             }
         }
 
-        won_set
+        (won_set, lost_set)
     }
 
     pub fn input_game_state_decider(max_stone_count: usize) {
-        let input_felder_txt = File::open("input_felder_5.txt")
+        let input_felder_txt = File::open("input_felder_3.txt")
             .expect("The 'input_felder.txt' file was not found in the projects root...");
         let reader = BufReader::new(input_felder_txt);
 
         let output_text = File::create("output.txt").expect("Could not create ro 'output.txt' to write results into");
         let mut writer = BufWriter::new(output_text);
-        writeln!(writer, "> Test!");
 
-        let won_set = EfficientPlayField::generate_all_won_playfields(max_stone_count);
-        writeln!(writer, "> Finished generating all won sets: {}", won_set.len());
-        let mut lost_set = HashSet::<EfficientPlayField>::new();
-
-        for pf in &won_set {
-            lost_set.insert(pf.invert_playfields_stone_colors().get_canonical_form());
-            //TODO kanone?
-        }
-        writeln!(writer, "> Finished generating all lost sets: {}!", lost_set.len());
+        let (won_set, lost_set) = EfficientPlayField::generate_all_won_playfields(max_stone_count);
+        println!("> Finished generating all sets:");
+        println!("> Won: {} --- Lost: {}", won_set.len(), lost_set.len());
 
         for line_content in reader.lines() {
             let mut playfield = EfficientPlayField::from_coded(&line_content.unwrap());
@@ -1142,64 +1169,6 @@ impl EfficientPlayField {
             writeln!(writer, "{}", nash_value).unwrap();
         }
     }
-
-    //ab hier wirds schwammig
-    /*     pub fn generate_won_and_lost_playfields() -> (HashSet<EfficientPlayField>, HashSet<EfficientPlayField>) {
-        let mut won_set = HashSet::<EfficientPlayField>::new();
-        let mut lost_set = HashSet::<EfficientPlayField>::new();
-
-        let won_ended_set = Self::generate_ended_game_plafields();
-
-        for current_playfield in won_ended_set {
-            current_playfield.mark_won(won_set, lost_set);
-        }
-
-        (won_set, lost_set)
-    }
-
-    fn mark_lost(&self, mut won_set: HashSet<EfficientPlayField>, mut lost_set: HashSet<EfficientPlayField>) {
-        if won_set.insert(self.clone()) {
-            for current_playfield in self.get_backward_moves(PlayerColor::White) {
-                current_playfield.mark_won(won_set, lost_set);
-            }
-        }
-    }
-
-    fn mark_won(&mut self, mut won_set: HashSet<EfficientPlayField>, lost_set: HashSet<EfficientPlayField>) {
-        if won_set.insert(self.clone()) {
-            for mut current_playfield in self.get_backward_moves(PlayerColor::White) {
-                let mut check_var = 0;
-
-                for current_forward in current_playfield.get_forward_moves(PlayerColor::Black) {
-                    if won_set.get(&current_forward) == None {
-                        check_var += 1;
-                        break;
-                    }
-                }
-
-                if check_var == 0 {
-                    current_playfield.mark_lost(won_set, lost_set);
-                }
-            }
-        }
-    } */
-
-    /*
-    mark_lost(P)
-    if (P !∈ L)
-        L:= L ∪ {P}         //Globale Variable
-        for z ∈ rückwärtsZüge(P)
-            P' = z(P)
-            mark_won(P')
-
-    mark_won(P)
-        if (P !∈ W)
-            W:= W ∪ {P}         //Globale Variable
-            for z ∈ rückwärtsZüge(P)
-                P' = z(P)
-                if z'(P') ∈ W für alle z' ∈ vorwärtsZüge(P')
-                    mark_lost(P')
-    */
 }
 
 #[cfg(test)]
@@ -1390,18 +1359,45 @@ mod tests {
 
     #[test]
     fn test_generate_all_won_playfields_9() {
-        let won_set = EfficientPlayField::generate_all_won_playfields(9);
+        let (won_set, lost_set) = EfficientPlayField::generate_all_won_playfields(9);
         println!("{}", won_set.len());
     }
 
     #[test]
     fn test_generate_all_won_playfields_5() {
-        let won_set = EfficientPlayField::generate_all_won_playfields(3);
-        println!("{}", won_set.len());
+        let (won_set, lost_set) = EfficientPlayField::generate_all_won_playfields(3);
+        println!("Won: {}", won_set.len());
+        println!("Lost: {}", lost_set.len());
     }
 
     #[test]
     fn test_input_game_state_decider_5() {
-        EfficientPlayField::input_game_state_decider(5);
+        EfficientPlayField::input_game_state_decider(3);
+    }
+
+    #[test]
+    fn output3_dbg_test() {
+        let failure_playfield_configs = [
+            "EEBEEWEEEEBEEWEEEEBEWEEE",
+            "BWEEEEEEBEWEEEEEBWEEEEEE",
+            "EEEWEBBBWEEEEEEEEEEEEEWE",
+            "EEEWEEEWEEEEWEEEBBEEEEEB",
+            "EEWEEEEWBBEEEEEBEEEEEEEW",
+            "EEEEEEEEEEEWEBBBWEWEEEEE",
+            "EEEEWEEWWEEEEEEEEEEBBBEE",
+            "BEEEWEWEBWEEEEEEBEEEEEEE",
+            "WEEEEEEEEEEEWEEEBBEWEEEB",
+            "EEEEWEEEEWEEEEEEWEEEEBBB",
+            "BWEEEEEEBEEEEWEEBEWEEEEE",
+            "WEEEEEEEBBEEWEEBEEEWEEEE",
+            "EEEEEEEEWWEBBBEWEEEEEEEE",
+        ];
+
+        let mut i = 0;
+        failure_playfield_configs.iter().for_each(|pf| {
+            let pf = EfficientPlayField::from_coded(pf);
+            println!("> PlayField on Index {i}:\n{pf}");
+            i += 1;
+        });
     }
 }
