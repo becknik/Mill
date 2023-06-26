@@ -32,7 +32,8 @@ pub struct EfficientPlayField {
     state: [u16; 3],
 }
 
-struct FieldPos {
+#[derive(Clone, Copy)]
+pub struct FieldPos {
     ring_index: usize,
     field_index: u16,
 }
@@ -562,7 +563,7 @@ impl EfficientPlayField {
 }
 
 /// Used by the [simulate_move_then_get_mills] method of [EfficientPlayField]
-enum MoveDirection {
+pub enum MoveDirection {
     OnRing { target_field_index: u16 },
     AcrossRings { target_ring_index: usize },
 }
