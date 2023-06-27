@@ -3,17 +3,20 @@
 
 use crate::game::efficient_state::{DirectionToCheck, EfficientPlayField, FieldPos, MoveDirection};
 
+use smallvec::SmallVec;
 use DirectionToCheck::*;
 use MoveDirection::*;
+
+use super::TO_TAKE_VEC_SIZE;
 
 impl EfficientPlayField {
     /// Simulates the move implicitly specified in the function header by it's parameters, but also all implications
     /// like the takes of moves which end up in a closed mill.
     ///
     /// TODO assert the start FieldPos field_index in abstract representation (<8)
-    pub fn simulate_all_possible_moves(
+    pub fn simulate_possible_forward_moves_for(
         &mut self,
-        fields_to_take: &Vec<(usize, u16)>,
+        fields_to_take: &SmallVec<[FieldPos; TO_TAKE_VEC_SIZE]>,
         start: FieldPos,
         direction: MoveDirection,
         color: u16,
@@ -44,8 +47,8 @@ impl EfficientPlayField {
 
             self.state[target_ring_index] = target_ring_backup;
         } else if let MoveDirection::OnRing { target_field_index } = direction {
-            // TODO assert!(target_field_index < 8);
             let target_field_index = target_field_index / 2;
+            assert!(target_field_index < 8);
 
             // Set the empty neighbors value to the old one of the current index:
             self.state[start.ring_index] |= color << (target_field_index * 2);
@@ -72,7 +75,7 @@ impl EfficientPlayField {
         direction: MoveDirection,
         color: u16,
         simulated_playfields: &mut Vec<EfficientPlayField>,
-        fields_to_take: &Vec<(usize, u16)>,
+        fields_to_take: &SmallVec<[FieldPos; TO_TAKE_VEC_SIZE]>,
     ) {
         let possible_mills_count = match direction {
             MoveDirection::OnRing { target_field_index } => self.get_mill_count(
@@ -94,12 +97,12 @@ impl EfficientPlayField {
     fn add_simulated_takes(
         &mut self,
         simulated_playfields: &mut Vec<EfficientPlayField>,
-        fields_to_take: &Vec<(usize, u16)>,
+        fields_to_take: &SmallVec<[FieldPos; TO_TAKE_VEC_SIZE]>,
     ) {
         let state_backup = self.state;
 
-        for (ring_index, bitmask_to_clear) in fields_to_take {
-            self.state[*ring_index] &= !bitmask_to_clear;
+        for field in fields_to_take {
+            self.state[field.ring_index] &= !(3u16 << (field.field_index * 2));
 
             simulated_playfields.push(self.clone());
             self.state = state_backup;

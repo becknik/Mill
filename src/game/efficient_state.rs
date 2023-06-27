@@ -126,7 +126,7 @@ impl EfficientPlayField {
             % 3;
     }
 
-    /// Returns the (index in representation form, state) of the on-ring neighbor of the specified field.
+    /// Returns the (index in abstract form, state) of the on-ring neighbor of the specified field.
     /// No alignment to the LSB is done.
     fn get_neighbor_field_states(&self, ring_index: usize, field_index: u16) -> [(u16, u16); 2] {
         let indices = [(field_index + 7) % 8, (field_index + 1) % 8];
@@ -509,7 +509,7 @@ impl EfficientPlayField {
     /// - The field state of the current index must be not null
     /// - The fields index must be 0..8 and the ring index 0..3
     fn get_mill_count(&self, ring_index: usize, field_index: u16, direction: DirectionToCheck) -> u32 {
-        //assert!(field_index < 16);
+        assert!(field_index < 8);
         //assert!(ring_index < 3);
 
         let mut mill_counter = 0;

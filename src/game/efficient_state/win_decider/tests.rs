@@ -22,7 +22,7 @@ fn test_get_fields_to_take() {
     println!("{test_playfield}");
     println!("\n--- Fields with legal stones taken ---\n");
 
-    let vec = test_playfield.get_fields_to_take(PlayerColor::Black);
+    let vec = test_playfield.get_bitmasks_to_take(PlayerColor::Black);
 
     let mut i = 0;
     vec.iter()
@@ -187,7 +187,7 @@ fn test_generate_all_won_playfields_9() {
 }
 
 #[test]
-fn test_generate_all_won_playfields_5() {
+fn test_generate_all_won_playfields_3() {
     let (won_set, lost_set) = EfficientPlayField::generate_all_won_playfields(3);
     println!("Won: {}", won_set.len());
     println!("Lost: {}", lost_set.len());
