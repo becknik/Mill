@@ -22,13 +22,14 @@ fn test_get_fields_to_take() {
     println!("{test_playfield}");
     println!("\n--- Fields with legal stones taken ---\n");
 
-    let vec = test_playfield.get_bitmasks_to_take(PlayerColor::Black);
+    let fields = test_playfield.get_fields_to_take(PlayerColor::Black);
 
     let mut i = 0;
-    vec.iter()
-        .map(|tuple| {
+    fields
+        .iter()
+        .map(|field| {
             let mut new_pf = test_playfield.clone();
-            new_pf.state[tuple.0] &= !tuple.1;
+            new_pf.state[field.ring_index] &= !(3u16 << (field.field_index * 2));
             new_pf
         })
         .for_each(|pf| {

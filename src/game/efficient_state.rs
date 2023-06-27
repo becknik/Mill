@@ -31,7 +31,7 @@ pub struct EfficientPlayField {
     state: [u16; 3],
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct FieldPos {
     ring_index: usize,
     field_index: u16,

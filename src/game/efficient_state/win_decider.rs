@@ -34,40 +34,6 @@ impl EfficientPlayField {
     }
 
     /// Returns the bit masks for the fields that can be taken by the player with player_color
-    fn get_bitmasks_to_take(&self, player_color: PlayerColor) -> SmallVec<[(usize, u16); TO_TAKE_VEC_SIZE]> {
-        let mut bitmasks_of_current_color_stones = SmallVec::<[(usize, u16); TO_TAKE_VEC_SIZE]>::new();
-        let mut not_in_mill_bitsmasks = SmallVec::<[(usize, u16); TO_TAKE_VEC_SIZE]>::new();
-
-        for ring_index in 0..3 {
-            for field_index in 0..8 {
-                let current_field_state = self.get_field_state_at(ring_index, field_index, true);
-
-                if current_field_state == player_color.into() {
-                    let bit_mask = 3u16 << (field_index * 2);
-                    bitmasks_of_current_color_stones.push((ring_index, bit_mask));
-
-                    if 0 == self.get_mill_count(
-                        ring_index,
-                        field_index,
-                        DirectionToCheck::OnAndAcrossRings {
-                            player_color: player_color.into(),
-                        },
-                    ) {
-                        not_in_mill_bitsmasks.push((ring_index, bit_mask));
-                    }
-                }
-            }
-        }
-
-        // If all stones are in mills, stones from mills can be taken
-        if not_in_mill_bitsmasks.is_empty() {
-            bitmasks_of_current_color_stones
-        } else {
-            not_in_mill_bitsmasks
-        }
-    }
-
-    /// Returns the bit masks for the fields that can be taken by the player with player_color
     fn get_fields_to_take(&self, player_color: PlayerColor) -> SmallVec<[FieldPos; TO_TAKE_VEC_SIZE]> {
         let mut all_stones_to_take_pos = SmallVec::<[FieldPos; TO_TAKE_VEC_SIZE]>::new();
         let mut not_in_mill_pos = SmallVec::<[FieldPos; TO_TAKE_VEC_SIZE]>::new();

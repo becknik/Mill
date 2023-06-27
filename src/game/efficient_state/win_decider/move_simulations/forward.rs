@@ -1,7 +1,9 @@
 //! To containerize all possible in-place functions with a backup to be applied after the operations executed.
 //! We call them "simulations"
 
-use crate::game::efficient_state::{DirectionToCheck, EfficientPlayField, FieldPos, MoveDirection, win_decider::TO_TAKE_VEC_SIZE};
+use crate::game::efficient_state::{
+    win_decider::TO_TAKE_VEC_SIZE, DirectionToCheck, EfficientPlayField, FieldPos, MoveDirection,
+};
 
 use smallvec::SmallVec;
 use DirectionToCheck::*;
@@ -10,8 +12,6 @@ use MoveDirection::*;
 impl EfficientPlayField {
     /// Simulates the move implicitly specified in the function header by it's parameters, but also all implications
     /// like the takes of moves which end up in a closed mill.
-    ///
-    /// TODO assert the start FieldPos field_index in abstract representation (<8)
     pub fn simulate_possible_forward_moves_for(
         &mut self,
         fields_to_take: &SmallVec<[FieldPos; TO_TAKE_VEC_SIZE]>,
@@ -20,11 +20,7 @@ impl EfficientPlayField {
         color: u16,
         simulated_playfields: &mut Vec<EfficientPlayField>,
     ) {
-        // TODO assert!(start.field_index < 8);
-        let start = FieldPos {
-            field_index: start.field_index / 2,
-            ..start
-        };
+        assert!(start.field_index < 8);
 
         let start_ring_backup = self.state[start.ring_index];
 
@@ -45,7 +41,6 @@ impl EfficientPlayField {
 
             self.state[target_ring_index] = target_ring_backup;
         } else if let MoveDirection::OnRing { target_field_index } = direction {
-            let target_field_index = target_field_index / 2;
             assert!(target_field_index < 8);
 
             // Set the empty neighbors value to the old one of the current index:

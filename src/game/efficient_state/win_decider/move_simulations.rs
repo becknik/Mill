@@ -33,7 +33,12 @@ impl EfficientPlayField {
                         self.state[ring_index] &= !(0x0003 << (field_index * 2));
 
                         for empty_field in self.get_empty_fields() {
-                            if ring_index == empty_field.ring_index && field_index == empty_field.field_index {
+                            if empty_field
+                                == (FieldPos {
+                                    ring_index,
+                                    field_index,
+                                })
+                            {
                                 continue;
                             }
 
@@ -164,29 +169,18 @@ impl EfficientPlayField {
         forward_moved_playfields
     }
 
+    #[rustfmt::skip]
     /// Simulates the backward moves of player with color player_color by calling [get_fields_to_place]
     pub fn get_backward_moves(&mut self, player_color: PlayerColor) -> Vec<EfficientPlayField> {
-        let mut output_playfields = Vec::<EfficientPlayField>::new();
+        let empty_fields = self.get_empty_fields();
 
-        //current fields to place a stone on, current field excluded
-        let mut fields_to_place = self.get_empty_field_bitmasks(!player_color);
+        let mut output_playfields = Vec::<EfficientPlayField>::new();
+        let mut simulated_playfield_buffer = Vec::<EfficientPlayField>::new();
 
         for ring_index in 0..3 {
-            for field_index in (0..16).step_by(2) {
-                // Current field state sifted to the LSB
-                let current_field_state: u16 = (self.state[ring_index] & (3u16 << field_index)) >> field_index;
+            for field_index in 0..8 {
+                let current_field_state = self.get_field_state_at(ring_index, field_index, true);
 
-                let current_tupel = (
-                    ring_index,
-                    <PlayerColor as Into<u16>>::into(player_color) << field_index,
-                );
-                let maybe_index = fields_to_place.iter().position(|tup| *tup == current_tupel);
-
-                if let Some(index) = maybe_index {
-                    fields_to_place.remove(index);
-                }
-
-                // If the current field is empty, we wont make any adjustments to the return values
                 if current_field_state == 0 {
                     continue;
                 }
@@ -198,34 +192,62 @@ impl EfficientPlayField {
                         // Check for mills before the move has taken place
                         let was_in_mill = self.get_mill_count(
                             ring_index,
-                            field_index / 2,
+                            field_index,
                             DirectionToCheck::OnAndAcrossRings {
                                 player_color: current_field_state,
                             },
                         );
 
-                        // Add all jump configurations into the vec
-                        let fields_to_place = self.get_empty_field_bitmasks(player_color);
-
                         let backup_state = self.state;
-                        self.state[ring_index] &= !(0x0003 << field_index);
+                        // clear out the current position
+                        self.state[ring_index] &= !(0x0003 << (field_index * 2));
 
-                        for placement in fields_to_place {
+                        // make jump-moves onto all free positions
+                        for to_jump_field in &empty_fields {
+                            // skip the current field
+                            /* if field == (FieldPos{ring_index, field_index}) {
+                                continue;
+                            } */
+
                             let mut clone = self.clone();
 
-                            clone.state[placement.0] |= placement.1;
+                            // Apply the jump to the state clone
+                            clone.state[to_jump_field.ring_index] |=
+                                <PlayerColor as Into<u16>>::into(player_color) << (to_jump_field.field_index * 2);
 
-                            if 0 < was_in_mill {
-                                let fields_to_place_taken_stone = clone.get_empty_field_bitmasks(!player_color);
+                            if 0 == was_in_mill {
+                                output_playfields.push(clone);
+                            }
+                            // If the jump was made by a stone which was previously located in a mill,
+                            // stones from the other color, which were previously taken by the color with the mill,
+                            // have to be added to the field again
+                            else {
+                                // self.add_simulated_placements(start, player_color, simulated_playfields); TODO!!!
+                                for to_place_field in clone.get_empty_fields() {
+                                    let mut after_jump_clone = clone.clone();
 
-                                for replacement in fields_to_place_taken_stone {
-                                    if !(ring_index == replacement.0 && replacement.1 & (0x0003 << field_index) != 0) {
+                                    // sorts out initial mill position
+                                    if to_place_field == (FieldPos { ring_index, field_index, }) {
+                                        continue;
+                                    }
+
+                                    // adds opposite colored stone (which has been taken be the mill) to empty field
+                                    after_jump_clone.state[to_place_field.ring_index] |= <PlayerColor as Into<u16>>::into(!player_color) << (to_place_field.field_index * 2);
+
+                                    // if the placed stone of the opposite color could be taken now,
+                                    // the placement of this stone would be valid and the current playfield config should be pushed
+                                    if after_jump_clone.get_fields_to_take(player_color).contains(&to_place_field) {
+                                        output_playfields.push(after_jump_clone);
+                                    }
+
+                                    // TODO what is this? and remove
+                                    /* if !(ring_index == replacement.0 && replacement.1 & (0x0003 << field_index) != 0) {
                                         let mut clone_2 = clone.clone();
 
                                         clone_2.state[replacement.0] |= replacement.1;
 
                                         //TODO
-                                        /* let mut stones_not_in_mill = 0;
+                                        let mut stones_not_in_mill = 0;
                                         for ring_index in 0..3 {
                                             for field_index in 0..8 {
                                                 if 0 == clone_2.get_mill_count(ring_index, field_index, DirectionToCheck::OnAndAcrossRings { player_color: (!player_color).into()}) {
@@ -256,22 +278,20 @@ impl EfficientPlayField {
                                             }
                                         } else {
                                             output_playfields.push(clone_2.clone());
-                                        } */
+                                        }
 
                                         //wenn alle steine in mühle -> push
                                         //wenn nicht
                                         // wenn dieser in mühle -> nicht push
                                         // wenn nicht -> push
 
-                                        /* if clone_2.get_mill_count(replacement.0, replacement.1, DirectionToCheck::OnAndAcrossRings { player_color: !player_color.into() }) {
+                                        if clone_2.get_mill_count(replacement.0, replacement.1, DirectionToCheck::OnAndAcrossRings { player_color: !player_color.into() }) {
                                             //ganz viele mühle checks:()
-                                        } */
+                                        }
 
                                         output_playfields.push(clone_2.clone());
-                                    }
+                                    } */
                                 }
-                            } else {
-                                output_playfields.push(clone.clone());
                             }
 
                             /* if 0 < was_in_mill {
@@ -289,20 +309,20 @@ impl EfficientPlayField {
                         }
                         self.state = backup_state;
                     } else {
-                        let ring_neighbors_indices = [(field_index + 14) % 16, (field_index + 18) % 16];
-                        for neighbor_index in ring_neighbors_indices {
-                            // Neighbor field state is empty - neighbor_index already are representational index (0 <= i < 16)
+                        for (neighbor_index, neighbor_state) in self.get_neighbor_field_states(ring_index, field_index) {
+
                             if (self.state[ring_index] & (3u16 << neighbor_index)) == 0 {
-                                let mut current_move_playfields = self.simulate_backward_move_get_playfields(
-                                    &fields_to_place,
-                                    ring_index,
-                                    field_index, // hier geteilt 2
+                                self.simulate_backward_move_get_playfields(
+                                    &empty_fields,
+                                    FieldPos {ring_index, field_index },
                                     MoveDirection::OnRing {
                                         target_field_index: neighbor_index,
                                     },
                                     player_color,
+                                    &mut simulated_playfield_buffer
                                 );
-                                output_playfields.append(&mut current_move_playfields);
+                                output_playfields.append(&mut simulated_playfield_buffer);
+                                simulated_playfield_buffer.clear();
                             }
                         }
 
@@ -314,58 +334,95 @@ impl EfficientPlayField {
                             match ring_index {
                                 // Inner Ring
                                 0 if next_rings_field_state == 0 => {
-                                    let mut current_move_playfields = self.simulate_backward_move_get_playfields(
-                                        &fields_to_place,
-                                        0,
-                                        field_index,
+                                    self.simulate_backward_move_get_playfields(
+                                        &empty_fields,
+                                        FieldPos {ring_index: 0, field_index },
                                         MoveDirection::AcrossRings { target_ring_index: 1 },
                                         player_color,
+                                        &mut simulated_playfield_buffer,
                                     );
-                                    output_playfields.append(&mut current_move_playfields);
+                                    output_playfields.append(&mut simulated_playfield_buffer);
+                                    simulated_playfield_buffer.clear();
                                 }
                                 // Mid Ring
                                 1 => {
                                     if previous_rings_field_state == 0 {
-                                        let mut current_move_playfields = self.simulate_backward_move_get_playfields(
-                                            &fields_to_place,
-                                            1,
-                                            field_index,
+                                        self.simulate_backward_move_get_playfields(
+                                            &empty_fields,
+                                            FieldPos {ring_index: 1, field_index },
                                             MoveDirection::AcrossRings { target_ring_index: 0 },
                                             player_color,
+                                            &mut simulated_playfield_buffer
                                         );
-                                        output_playfields.append(&mut current_move_playfields);
+                                        output_playfields.append(&mut simulated_playfield_buffer);
+                                        simulated_playfield_buffer.clear();
                                     }
 
                                     if next_rings_field_state == 0 {
-                                        let mut current_move_playfields = self.simulate_backward_move_get_playfields(
-                                            &fields_to_place,
-                                            1,
-                                            field_index,
+                                        self.simulate_backward_move_get_playfields(
+                                            &empty_fields,
+                                            FieldPos {ring_index: 1, field_index },
                                             MoveDirection::AcrossRings { target_ring_index: 2 },
                                             player_color,
+                                            &mut simulated_playfield_buffer
                                         );
-                                        output_playfields.append(&mut current_move_playfields);
+                                        output_playfields.append(&mut simulated_playfield_buffer);
+                                        simulated_playfield_buffer.clear();
                                     }
                                 }
                                 // Outer Ring
                                 2 if previous_rings_field_state == 0 => {
-                                    let mut current_move_playfields = self.simulate_backward_move_get_playfields(
-                                        &fields_to_place,
-                                        2,
-                                        field_index,
+                                    self.simulate_backward_move_get_playfields(
+                                        &empty_fields,
+                                        FieldPos {ring_index: 2, field_index },
                                         MoveDirection::AcrossRings { target_ring_index: 1 },
                                         player_color,
+                                        &mut simulated_playfield_buffer
                                     );
-                                    output_playfields.append(&mut current_move_playfields);
+                                    output_playfields.append(&mut simulated_playfield_buffer);
+                                    simulated_playfield_buffer.clear();
                                 }
                                 _ => {}
                             }
                         }
                     }
                 }
-                fields_to_place.push(current_tupel);
+                // empty_fields.push(current_tupel); // TODO wtf?! this makes no sense
             }
         }
         output_playfields
+    }
+
+    fn add_simulated_placements(
+        &mut self,
+        start: FieldPos,
+        player_color: PlayerColor,
+        simulated_playfields: &mut Vec<EfficientPlayField>,
+    ) {
+        let backup_after_move = self.state;
+
+        for to_place_field in self.get_empty_fields() {
+            // sorts out initial mill position
+            if to_place_field
+                == (FieldPos {
+                    ring_index: start.ring_index,
+                    field_index: start.field_index,
+                })
+            {
+                continue;
+            }
+
+            // adds opposite colored stone (which has been taken be the mill) to empty field
+            self.state[to_place_field.ring_index] |=
+                <PlayerColor as Into<u16>>::into(!player_color) << (to_place_field.field_index * 2);
+
+            // if the placed stone of the opposite color could be taken now,
+            // the placement of this stone would be valid and the current playfield config should be pushed
+            if self.get_fields_to_take(player_color).contains(&to_place_field) {
+                simulated_playfields.push(self.clone());
+            }
+
+            self.state = backup_after_move;
+        }
     }
 }
