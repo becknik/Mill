@@ -71,7 +71,7 @@ impl EfficientPlayField {
                 let backup_after_first_move = self.state;
 
                 'outer: for field_and_bitmask in fields_to_place {
-                    let target_field_state = self.state[start_ring_index] & (0x0003 << target_field_index);
+                    let _target_field_state = self.state[start_ring_index] & (0x0003 << target_field_index);
 
                     // excludes field where stone moved to
                     if start_ring_index == field_and_bitmask.0 {

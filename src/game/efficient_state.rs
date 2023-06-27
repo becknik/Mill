@@ -7,7 +7,6 @@ use std::{
     fs::File,
     hash::{Hash, Hasher},
     io::{BufRead, BufReader, BufWriter, Write},
-    process::id,
 };
 
 use super::PlayerColor;
@@ -420,7 +419,7 @@ impl EfficientPlayField {
 
     fn get_positions(&self, color: PlayerColor) -> (SmallVec<[FieldPos; 9]>, SmallVec<[FieldPos; 9]>) {
         let mut color_positions = SmallVec::<[FieldPos; 9]>::default();
-        let mut not_color_positions = SmallVec::<[FieldPos; 9]>::default();
+        let not_color_positions = SmallVec::<[FieldPos; 9]>::default();
 
         for ring_index in 0..3 {
             for field_index in 0..8 {

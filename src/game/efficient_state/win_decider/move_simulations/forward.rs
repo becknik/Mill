@@ -1,13 +1,11 @@
 //! To containerize all possible in-place functions with a backup to be applied after the operations executed.
 //! We call them "simulations"
 
-use crate::game::efficient_state::{DirectionToCheck, EfficientPlayField, FieldPos, MoveDirection};
+use crate::game::efficient_state::{DirectionToCheck, EfficientPlayField, FieldPos, MoveDirection, win_decider::TO_TAKE_VEC_SIZE};
 
 use smallvec::SmallVec;
 use DirectionToCheck::*;
 use MoveDirection::*;
-
-use super::TO_TAKE_VEC_SIZE;
 
 impl EfficientPlayField {
     /// Simulates the move implicitly specified in the function header by it's parameters, but also all implications

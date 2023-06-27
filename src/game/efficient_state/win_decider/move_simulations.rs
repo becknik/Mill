@@ -218,7 +218,7 @@ impl EfficientPlayField {
                             if 0 < was_in_mill {
                                 let fields_to_place_taken_stone = clone.get_empty_field_bitmasks(!player_color);
 
-                                for mut replacement in fields_to_place_taken_stone {
+                                for replacement in fields_to_place_taken_stone {
                                     if !(ring_index == replacement.0 && replacement.1 & (0x0003 << field_index) != 0) {
                                         let mut clone_2 = clone.clone();
 
