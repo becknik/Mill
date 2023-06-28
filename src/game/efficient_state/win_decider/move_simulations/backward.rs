@@ -6,6 +6,7 @@ use crate::game::{
 };
 
 impl EfficientPlayField {
+
     // returns vec of one move from one given stone
     pub fn simulate_backward_move_get_playfields(
         &mut self,
@@ -19,7 +20,7 @@ impl EfficientPlayField {
 
         let start_ring_backup = self.state[start.ring_index];
 
-        let was_in_mill = self.get_mill_count(
+        let init_mill_count = self.get_mill_count(
             start.ring_index,
             start.field_index,
             DirectionToCheck::OnAndAcrossRings {
@@ -36,8 +37,8 @@ impl EfficientPlayField {
             // Setting the moved stone on the other ring
             self.state[target_ring_index] |= stone_color << (start.field_index * 2);
 
-            if was_in_mill == 0 {
-                simulated_playfields.push(self.clone());
+            if init_mill_count == 0 {
+                simulated_playfields.push(*self);
             } else {
                 self.add_simulated_placements(start, player_color, simulated_playfields);
             }
@@ -48,10 +49,10 @@ impl EfficientPlayField {
             assert!(target_field_index < 8);
 
             // Set the empty neighbors value to the old one of the current index:
-            self.state[start.ring_index] |= stone_color << target_field_index;
+            self.state[start.ring_index] |= stone_color << (target_field_index * 2);
 
-            if was_in_mill == 0 {
-                simulated_playfields.push(self.clone());
+            if init_mill_count == 0 {
+                simulated_playfields.push(*self);
             } else {
                 self.add_simulated_placements(start, player_color, simulated_playfields);
             }
