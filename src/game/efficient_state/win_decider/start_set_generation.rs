@@ -6,7 +6,7 @@ use crate::game::{
 };
 
 impl EfficientPlayField {
-    pub fn generate_start_won_configs_white(max_stone_count: usize) -> FnvHashSet<EfficientPlayField> {
+    pub fn generate_start_won_configs_white(max_stone_count: i32) -> FnvHashSet<EfficientPlayField> {
         let mut won_set = FnvHashSet::<EfficientPlayField>::default();
         let mill_configs = Self::generate_3_canon_mills();
 
@@ -36,7 +36,7 @@ impl EfficientPlayField {
                     //adding second black stone
                     config.state[ring_index] |= 2u16 << (field_index * 2);
 
-                    won_set.insert(config.get_canonical_form());
+                    won_set.insert(config.get_canon_form());
 
                     // white stones must be placed before black ones => start_index = 0
                     config.distribute_stones_and_add(PlayerColor::White, max_stone_count - 3, 0, &mut won_set);
@@ -77,7 +77,7 @@ impl EfficientPlayField {
     fn distribute_stones_and_add(
         &mut self,
         stone_color: PlayerColor,
-        amount_of_stones: usize,
+        amount_of_stones: i32,
         start_index: u16,
         set: &mut FnvHashSet<EfficientPlayField>,
     ) {
@@ -93,9 +93,9 @@ impl EfficientPlayField {
                 let ring_backup = self.state[ring_index];
                 self.state[ring_index] |= <PlayerColor as Into<u16>>::into(stone_color) << (field_index * 2);
 
-                set.insert(self.get_canonical_form());
+                set.insert(self.get_canon_form());
 
-                if 24 <= start_index {
+                if 23 < start_index {
                     return;
                 }
                 // Recursive call with one stones less to the next start_index
@@ -112,7 +112,7 @@ impl EfficientPlayField {
     ///
     /// First places 4 black fields onto the playfield and then distributes the further black ones on the field.
     /// After this, the method tries to enclose these generated black field with white ones by calling [enclose_black_stones]
-    fn generate_black_enclosed_configs(max_stone_count: usize, won_set: &mut FnvHashSet<EfficientPlayField>) {
+    pub fn generate_black_enclosed_configs(max_stone_count: i32, won_set: &mut FnvHashSet<EfficientPlayField>) {
         let pf = EfficientPlayField::default();
         let mut black_only = FnvHashSet::<EfficientPlayField>::default();
 
@@ -144,7 +144,7 @@ impl EfficientPlayField {
                         let mut pf = pf.clone();
                         pf.state[ring_index] |= 2u16 << (field_index * 2);
 
-                        black_only.insert(pf.get_canonical_form());
+                        black_only.insert(pf.get_canon_form());
 
                         // Adding combinations of 4<= playfieds to the black only set
                         // 4 <= due to 3 can't be enclosed by white stones because of possible jumping
@@ -172,24 +172,24 @@ impl EfficientPlayField {
     /// and if possible extra placements of left over white stones
     fn enclose_black_stones(
         &mut self,
-        max_stone_count: usize,
+        max_stone_count: i32,
         won_set: &mut FnvHashSet<EfficientPlayField>,
-        enclosing_config_buffer: &mut FnvHashSet<FieldPos>,
+        enclosing_field_buffer: &mut FnvHashSet<FieldPos>,
     ) {
-        self.get_placements_to_enclose_black(enclosing_config_buffer);
-        let amount_of_white_moves = enclosing_config_buffer.len(); // neccessary beacuase of move
+        self.get_placements_to_enclose_black(enclosing_field_buffer);
+        let amount_of_white_moves_to_place = enclosing_field_buffer.len() as i32;
 
-        if amount_of_white_moves <= max_stone_count {
+        if amount_of_white_moves_to_place <= max_stone_count {
             // places a white stone on all possible placements
-            for FieldPos { ring_index, field_index } in enclosing_config_buffer.iter() {
-                self.state[*ring_index] |= 1u16 << field_index;
+            for FieldPos { ring_index, field_index } in enclosing_field_buffer.iter() {
+                self.state[*ring_index] |= 1u16 << (field_index * 2);
             }
 
             //enclosure without extra stones placed
-            won_set.insert(self.clone().get_canonical_form());
+            won_set.insert(self.clone().get_canon_form());
 
             // if there are leftovers, all possible placements are done and added to the set
-            let left_overs = max_stone_count - amount_of_white_moves;
+            let left_overs = max_stone_count - amount_of_white_moves_to_place;
             self.distribute_stones_and_add(PlayerColor::White, left_overs, 0, won_set);
         }
     }

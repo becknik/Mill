@@ -28,7 +28,7 @@ fn canonical_form_benchmark(c: &mut Criterion) {
     c.bench_function("canonical_form1", move |b| {
         b.iter(|| {
             test_play_fields.iter_mut().for_each(|pf| {
-                pf.get_canonical_form();
+                pf.get_canon_form();
             })
         });
     });

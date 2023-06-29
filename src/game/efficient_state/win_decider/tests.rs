@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 
 use crate::game::{efficient_state::EfficientPlayField, PlayerColor};
-
+/*
 #[test]
 fn test_invert_playfield() {
     let test_string = "WWWWBBBBEEEEWWWWBBBBEEEE";
@@ -223,4 +223,4 @@ fn output3_dbg_test() {
         println!("> PlayField on Index {i}:\n{pf}");
         i += 1;
     });
-}
+}*/

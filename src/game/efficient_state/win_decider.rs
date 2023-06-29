@@ -1,5 +1,4 @@
 use std::{
-    collections::HashSet,
     collections::VecDeque,
     fs::File,
     io::{BufRead, BufReader, BufWriter, Write},
@@ -9,12 +8,16 @@ use fnv::FnvHashSet;
 use smallvec::SmallVec;
 
 use super::EfficientPlayField;
-use super::MoveDirection;
 use super::{DirectionToCheck, FieldPos};
 use crate::game::PlayerColor;
 
 mod move_simulations;
 mod start_set_generation;
+
+#[cfg(test)]
+mod tests;
+#[cfg(test)]
+mod unit_tests;
 
 const TO_TAKE_VEC_SIZE: usize = 64;
 
@@ -88,33 +91,8 @@ impl EfficientPlayField {
         empty_fields
     }
 
-    pub fn invert_playfields_stone_colors(&self) -> EfficientPlayField {
-        let mut current_playfield = self.clone();
-
-        for ring_index in 0..3 {
-            for field_index in 0..8 {
-                match (current_playfield.state[ring_index] & (0x0003 << (field_index * 2))) >> (field_index * 2) {
-                    0x0000 => (),
-                    0x0001 => {
-                        current_playfield.state[ring_index] = (current_playfield.state[ring_index]
-                            & !(0x0003 << (field_index * 2)))
-                            | (0x0002 << (field_index * 2))
-                    }
-                    0x0002 => {
-                        current_playfield.state[ring_index] = (current_playfield.state[ring_index]
-                            & !(0x0003 << (field_index * 2)))
-                            | (0x0001 << (field_index * 2))
-                    }
-                    _ => {}
-                }
-            }
-        }
-
-        current_playfield
-    }
-
     pub fn generate_won_configs_black_and_white(
-        max_stone_count: usize,
+        max_stone_count: i32,
     ) -> (FnvHashSet<EfficientPlayField>, FnvHashSet<EfficientPlayField>) {
         let mut won_set = EfficientPlayField::generate_start_won_configs_white(max_stone_count);
 
@@ -136,6 +114,7 @@ impl EfficientPlayField {
 
         let mut counter = 0;
         while let Some((tree_level_bottom_up, mut current)) = work_queue.pop_front() {
+            // debug stuff
             counter += 1;
             if counter % 1_000 == 0 {
                 println!(
@@ -150,7 +129,7 @@ impl EfficientPlayField {
             if tree_level_bottom_up % 2 == 0 {
                 // Every backward move is going to be added:
                 for mut backward_move_config in current.get_backward_moves(PlayerColor::White) {
-                    backward_move_config = backward_move_config.get_canonical_form();
+                    backward_move_config = backward_move_config.get_canon_form();
 
                     if !won_set.contains(&backward_move_config) {
                         won_set.insert(backward_move_config);
@@ -162,10 +141,10 @@ impl EfficientPlayField {
             else {
                 for mut backward_playfield in current.get_backward_moves(PlayerColor::Black) {
                     let mut all_forward_moves_in_won = true;
-                    backward_playfield = backward_playfield.get_canonical_form();
+                    backward_playfield = backward_playfield.get_canon_form();
 
                     for mut forward_playfield in backward_playfield.get_forward_moves(PlayerColor::Black) {
-                        forward_playfield = forward_playfield.get_canonical_form();
+                        forward_playfield = forward_playfield.get_canon_form();
                         if !won_set.contains(&forward_playfield) {
                             all_forward_moves_in_won = false;
                         }
@@ -173,7 +152,7 @@ impl EfficientPlayField {
 
                     // Adds the inverted backward_playfield to lost_set
                     if all_forward_moves_in_won {
-                        let insert_playfield = backward_playfield.invert_playfields_stone_colors().get_canonical_form();
+                        let insert_playfield = backward_playfield.invert_playfields_stone_colors().get_canon_form();
 
                         if !lost_set.contains(&insert_playfield) {
                             lost_set.insert(insert_playfield);
@@ -187,7 +166,30 @@ impl EfficientPlayField {
         (lost_set, won_set)
     }
 
-    pub fn input_game_state_decider(max_stone_count: usize) {
+    pub fn invert_playfields_stone_colors(&self) -> EfficientPlayField {
+        let mut current_playfield = self.clone();
+
+        for ring_index in 0..3 {
+            for field_index in 0..8 {
+                match self.get_field_state_at(ring_index, field_index, true) {
+                    1u16 => {
+                        current_playfield.state[ring_index] = (current_playfield.state[ring_index]
+                            & !(3u16 << (field_index * 2)))
+                            | (2u16 << (field_index * 2))
+                    }
+                    2u16 => {
+                        current_playfield.state[ring_index] = (current_playfield.state[ring_index]
+                            & !(3u16 << (field_index * 2)))
+                            | (1u16 << (field_index * 2))
+                    }
+                    _ => {}
+                }
+            }
+        }
+        current_playfield
+    }
+
+    pub fn input_game_state_decider(max_stone_count: i32) {
         let input_felder_txt = File::open("input_felder_3.txt")
             .expect("The 'input_felder.txt' file was not found in the projects root...");
         let reader = BufReader::new(input_felder_txt);
@@ -201,7 +203,7 @@ impl EfficientPlayField {
 
         for line_content in reader.lines() {
             let mut playfield = EfficientPlayField::from_coded(&line_content.unwrap());
-            let canonical_form = playfield.get_canonical_form();
+            let canonical_form = playfield.get_canon_form();
 
             let nash_value = if won_set.contains(&canonical_form) {
                 2
@@ -215,9 +217,3 @@ impl EfficientPlayField {
         }
     }
 }
-
-#[cfg(test)]
-mod tests;
-
-#[cfg(test)]
-mod unit_tests;

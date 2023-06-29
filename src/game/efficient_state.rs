@@ -178,7 +178,7 @@ impl EfficientPlayField {
     // TODO &mut might be a failure... micro benchmark this!
     // pub because of benchmarking
     //#[inline]
-    pub fn get_canonical_form(&mut self) -> EfficientPlayField {
+    pub fn get_canon_form(&mut self) -> EfficientPlayField {
         let mut canonical_form = EfficientPlayField::default();
 
         for _i in 0..2 {
@@ -206,9 +206,9 @@ impl EfficientPlayField {
         &mut self,
         other_play_field: &mut EfficientPlayField,
     ) -> Option<EfficientPlayField> {
-        let canonical_form_1 = self.get_canonical_form();
+        let canonical_form_1 = self.get_canon_form();
 
-        if canonical_form_1 == other_play_field.get_canonical_form() {
+        if canonical_form_1 == other_play_field.get_canon_form() {
             Some(canonical_form_1)
         } else {
             None
@@ -558,7 +558,7 @@ fn process_input_fields_canonical() {
 
         let mut playfield = EfficientPlayField::from_coded(&line_content.unwrap());
         println!("{playfield}");
-        let canonical_form = playfield.get_canonical_form();
+        let canonical_form = playfield.get_canon_form();
         println!("{canonical_form}");
 
         match output_map.get(&canonical_form) {
@@ -706,7 +706,7 @@ mod tests {
 
             println!("{}", epf);
 
-            let epf = epf.get_canonical_form();
+            let epf = epf.get_canon_form();
 
             println!("Output: {}", epf.to_string_representation());
         }
