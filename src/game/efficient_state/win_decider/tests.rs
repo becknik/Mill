@@ -183,13 +183,13 @@ fn test_generate_won_set() {
 
 #[test]
 fn test_generate_all_won_playfields_9() {
-    let (won_set, _lost_set) = EfficientPlayField::generate_all_won_playfields(9);
+    let (won_set, _lost_set) = EfficientPlayField::generate_won_configs_black_and_white(9);
     println!("{}", won_set.len());
 }
 
 #[test]
 fn test_generate_all_won_playfields_3() {
-    let (won_set, lost_set) = EfficientPlayField::generate_all_won_playfields(3);
+    let (won_set, lost_set) = EfficientPlayField::generate_won_configs_black_and_white(3);
     println!("Won: {}", won_set.len());
     println!("Lost: {}", lost_set.len());
 }
