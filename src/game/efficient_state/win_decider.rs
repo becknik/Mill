@@ -13,6 +13,7 @@ use super::{DirectionToCheck, FieldPos};
 use crate::game::PlayerColor;
 
 mod move_simulations;
+mod start_set_generation;
 
 const TO_TAKE_VEC_SIZE: usize = 64;
 
@@ -34,21 +35,25 @@ impl EfficientPlayField {
     }
 
     /// Returns the FieldPos field coordinates of stones that can be taken by the player with player_color
-    fn get_fields_to_take(&self, player_color: PlayerColor) -> SmallVec<[FieldPos; TO_TAKE_VEC_SIZE]> {
+    /// Therefore, the SmallVec returns only fields with stones of the color !player_color
+    fn get_fields_to_take_by(&self, player_color: PlayerColor) -> SmallVec<[FieldPos; TO_TAKE_VEC_SIZE]> {
         let mut all_stones_to_take_pos = SmallVec::<[FieldPos; TO_TAKE_VEC_SIZE]>::new();
         let mut not_in_mill_pos = SmallVec::<[FieldPos; TO_TAKE_VEC_SIZE]>::new();
+
+        let opponent_player_color_rep: u16 = (!player_color).into();
 
         for ring_index in 0..3 {
             for field_index in 0..8 {
                 let current_field_state = self.get_field_state_at(ring_index, field_index, true);
 
-                if current_field_state == player_color.into() {
+                if current_field_state == opponent_player_color_rep {
                     all_stones_to_take_pos.push(FieldPos { ring_index, field_index });
 
+                    // If the opponent has no mill on this field, add this field to the appropriate set
                     if 0 == self.get_mill_count(
                         ring_index,
                         field_index,
-                        DirectionToCheck::OnAndAcrossRings { player_color: player_color.into() },
+                        DirectionToCheck::OnAndAcrossRings { player_color: opponent_player_color_rep },
                     ) {
                         not_in_mill_pos.push(FieldPos { ring_index, field_index });
                     }
@@ -64,85 +69,20 @@ impl EfficientPlayField {
         }
     }
 
-    /// Returns the bitmasks of fields which are free to place a stone upon.
-    ///
-    /// TODO For consistency let this return the field indices
-    fn get_empty_field_bitmasks(&self, player_color: PlayerColor) -> Vec<(usize, u16)> {
-        let mut empty_fields_to_place_bitmasks = Vec::<(usize, u16)>::new();
-
-        for ring_index in 0..3 {
-            for field_index in 0..8 {
-                let current_field_state = self.get_field_state_at(ring_index, field_index, false);
-                if current_field_state != 0 {
-                    continue;
-                }
-
-                let field_index_as_bitmask = <PlayerColor as Into<u16>>::into(player_color) << (field_index * 2);
-
-                empty_fields_to_place_bitmasks.push((ring_index, field_index_as_bitmask));
-            }
-        }
-        empty_fields_to_place_bitmasks
-    }
-
     /// Returns the fields which are free to place a stone upon.
     fn get_empty_fields(&self) -> SmallVec<[FieldPos; 19]> {
-        let mut empty_fields_to_place = SmallVec::<[FieldPos; 19]>::new();
+        let mut empty_fields = SmallVec::<[FieldPos; 19]>::new();
 
         for ring_index in 0..3 {
             for field_index in 0..8 {
                 let current_field_state = self.get_field_state_at(ring_index, field_index, false);
-                if current_field_state != 0 {
-                    continue;
-                }
 
-                empty_fields_to_place.push(FieldPos { ring_index, field_index });
+                if current_field_state == 0 {
+                    empty_fields.push(FieldPos { ring_index, field_index });
+                }
             }
         }
-        empty_fields_to_place
-    }
-
-    //unnecessary but works
-    fn generate_permutations(prefix: u16, s_count: usize, w_count: usize, permutations: &mut Vec<u16>) {
-        if s_count == 0 && w_count == 0 {
-            permutations.push(prefix);
-            return;
-        }
-
-        if s_count > 0 {
-            let new_prefix = (prefix << 2) | 0x0002;
-            Self::generate_permutations(new_prefix, s_count - 1, w_count, permutations);
-        }
-
-        if w_count > 0 {
-            let new_prefix = (prefix << 2) | 0x0001;
-            Self::generate_permutations(new_prefix, s_count, w_count - 1, permutations);
-        }
-    }
-
-    /// Hard-coded generation of the only 3 unique (using mirroring, rotation, swapping of ring index) mill positions
-    fn generate_muehle_placements() -> Vec<EfficientPlayField> {
-        let mut muehle_placement_playfield = Vec::<EfficientPlayField>::new();
-
-        let mut template_1 = EfficientPlayField::default();
-        template_1.set_field_state(2, 7, 1);
-        template_1.set_field_state(2, 0, 1);
-        template_1.set_field_state(2, 1, 1);
-        muehle_placement_playfield.push(template_1);
-
-        let mut template_2 = EfficientPlayField::default();
-        template_2.set_field_state(1, 7, 1);
-        template_2.set_field_state(1, 0, 1);
-        template_2.set_field_state(1, 1, 1);
-        muehle_placement_playfield.push(template_2);
-
-        let mut template_3 = EfficientPlayField::default();
-        template_3.set_field_state(2, 0, 1);
-        template_3.set_field_state(1, 0, 1);
-        template_3.set_field_state(0, 0, 1);
-        muehle_placement_playfield.push(template_3);
-
-        muehle_placement_playfield
+        empty_fields
     }
 
     pub fn invert_playfields_stone_colors(&self) -> EfficientPlayField {
@@ -170,136 +110,13 @@ impl EfficientPlayField {
         current_playfield
     }
 
-    fn generate_white_won_configurations(max_stone_count: usize) -> HashSet<EfficientPlayField> {
-        let mut won_set = HashSet::<EfficientPlayField>::new();
-
-        let configs_with_white_mill = Self::generate_muehle_placements();
-
-        for config in configs_with_white_mill {
-            for i in 0..24 {
-                let ring_index = (i / 8) as usize;
-                let field_index = i % 8;
-
-                // to avoid placing stones onto already present mills
-                if (config.state[ring_index] & (3u16 << (field_index * 2))) != 0 {
-                    continue;
-                }
-
-                let mut config = config.clone();
-                config.state[ring_index] |= 0x0002 << (field_index * 2);
-
-                for j in (i + 1)..24 {
-                    let ring_index = (j / 8) as usize;
-                    let field_index = j % 8;
-
-                    // to avoid placing stones onto already present mills
-                    if (config.state[ring_index] & (3u16 << (field_index * 2))) != 0 {
-                        continue;
-                    }
-
-                    let mut config = config.clone();
-                    config.state[ring_index] |= 0x0002 << (field_index * 2);
-                    //println!("{clone}");
-
-                    won_set.insert(config.get_canonical_form());
-
-                    // white stones must be placed before black ones => start_index = 0
-                    config.place_stones_across_playfield(PlayerColor::White, max_stone_count - 3, 0, &mut won_set);
-                }
-            }
-        }
-        //Self::add_white_won_configurations_enclosed(&mut won_set, canonical_form);
-
-        won_set
-    }
-
-    fn place_stones_across_playfield(
-        &self,
-        stone_color: PlayerColor,
-        recursion_depth: usize, //from u32 to usize
-        start_index: u32,
-        set: &mut HashSet<EfficientPlayField>,
-    ) {
-        if 0 < recursion_depth {
-            for i in start_index..24 {
-                let ring_index = (i / 8) as usize;
-                let field_index = i % 8;
-
-                if (self.state[ring_index] & (3u16 << (field_index * 2))) != 0 {
-                    continue;
-                }
-
-                // TODO use the in-place mutable version here for more preformance
-                //let ring_backup = self.state[ring_index];
-                // self.state[ring_index] =
-
-                let mut modified_self = match ring_index {
-                    0 => EfficientPlayField {
-                        state: [
-                            self.state[ring_index]
-                                | (<PlayerColor as Into<u16>>::into(stone_color) << (field_index * 2)),
-                            self.state[ring_index + 1],
-                            self.state[ring_index + 2],
-                        ],
-                    },
-                    1 => EfficientPlayField {
-                        state: [
-                            self.state[ring_index - 1],
-                            self.state[ring_index]
-                                | (<PlayerColor as Into<u16>>::into(stone_color) << (field_index * 2)),
-                            self.state[ring_index + 1],
-                        ],
-                    },
-                    2 => EfficientPlayField {
-                        state: [
-                            self.state[ring_index - 2],
-                            self.state[ring_index - 1],
-                            self.state[ring_index]
-                                | (<PlayerColor as Into<u16>>::into(stone_color) << (field_index * 2)),
-                        ],
-                    },
-                    _ => EfficientPlayField::default(), // neglected panic!
-                };
-
-                // for enclosing playfields: only add fields where the amount of white black is equivalent/less to the amount
-                // taken by mills
-                /* if matches!(stone_color, PlayerColor::Black) {
-                    let amount_black_stones = 4 /* black stones placed before calling this method */
-                        + (5 /* stones already placed by this method */ - recursion_depth);
-
-                    let (white_mill_count, amount_of_double_mills) =
-                        modified_self.get_total_amount_of_mills_and_double_mills(PlayerColor::White);
-                    let white_mill_count = white_mill_count - amount_of_double_mills;
-
-                    if amount_black_stones <= (9 - white_mill_count) {
-                        set.insert(modified_self.get_canonical_form());
-                    }
-                }
-                //for not enclosing playfields
-                else {
-                    set.insert(modified_self.get_canonical_form());
-                } */
-
-                set.insert(modified_self.get_canonical_form());
-
-                if 24 <= start_index {
-                    return;
-                } else if 1 < recursion_depth {
-                    modified_self.place_stones_across_playfield(stone_color, recursion_depth - 1, i + 1, set);
-                }
-
-                //self.state[ring_index] = ring_backup;
-            }
-        }
-    }
-
     // schwarz iterative random, aähnlich so wie in den rekusiven AUfruf oben
     // pro stein, alle züge mit weiß abdecken
     //   wenn 9 weiße setine zu platzieren sind aber noch schwarz oder mehr weiße steine benötigt werden -> continue
     // wenn alles blockiert und übrige weiß > 0 -> random übrige schwarze und weiße platzieren in empty fields
-    fn add_white_won_configurations_enclosed(max_stone_count: usize, won_set: &mut HashSet<EfficientPlayField>) {
+    fn add_white_won_configurations_enclosed(max_stone_count: usize, won_set: &mut FnvHashSet<EfficientPlayField>) {
         let pf = EfficientPlayField::default();
-        let mut black_only = HashSet::<EfficientPlayField>::new();
+        let mut black_only = FnvHashSet::<EfficientPlayField>::new();
         //let mut won_set_enclosed = HashSet::<EfficientPlayField>::new();
 
         for i in 0..24 {

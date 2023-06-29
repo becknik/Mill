@@ -22,7 +22,7 @@ fn test_get_fields_to_take() {
     println!("{test_playfield}");
     println!("\n--- Fields with legal stones taken ---\n");
 
-    let fields = test_playfield.get_fields_to_take(PlayerColor::Black);
+    let fields = test_playfield.get_fields_to_take_by(PlayerColor::Black);
 
     let mut i = 0;
     fields

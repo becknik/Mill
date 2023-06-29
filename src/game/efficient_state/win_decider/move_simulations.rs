@@ -9,7 +9,7 @@ mod forward;
 impl EfficientPlayField {
     pub fn get_forward_moves(&mut self, player_color: PlayerColor) -> Vec<EfficientPlayField> {
         // Place here because it seems to be used in both branches...
-        let fields_to_take = self.get_fields_to_take(!player_color);
+        let fields_to_take = self.get_fields_to_take_by(player_color);
 
         let mut forward_moved_playfields = Vec::<EfficientPlayField>::new();
         let mut simulated_playfield_buffer = Vec::<EfficientPlayField>::new();
@@ -374,7 +374,7 @@ impl EfficientPlayField {
 
             // if the placed stone of the opposite color could be taken now,
             // the placement of this stone would be valid and the current playfield config should be pushed
-            if self.get_fields_to_take(player_color).contains(&empty_field) {
+            if self.get_fields_to_take_by(player_color).contains(&empty_field) {
                 simulated_playfields.push(self.clone());
             }
 

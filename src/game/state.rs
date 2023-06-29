@@ -43,7 +43,10 @@ pub struct PlayField {
 
 impl Default for PlayField {
     fn default() -> Self {
-        Self { state: [FieldState::Free; FIELD_COUNT], amount_of_stones: (0, 0) }
+        Self {
+            state: [FieldState::Free; FIELD_COUNT],
+            amount_of_stones: (0, 0),
+        }
     }
 }
 
