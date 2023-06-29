@@ -6,7 +6,6 @@ use crate::game::{
 };
 
 impl EfficientPlayField {
-
     // returns vec of one move from one given stone
     pub fn simulate_backward_move_get_playfields(
         &mut self,
@@ -23,9 +22,7 @@ impl EfficientPlayField {
         let init_mill_count = self.get_mill_count(
             start.ring_index,
             start.field_index,
-            DirectionToCheck::OnAndAcrossRings {
-                player_color: stone_color,
-            },
+            DirectionToCheck::OnAndAcrossRings { player_color: stone_color },
         );
 
         // Clear out the current index

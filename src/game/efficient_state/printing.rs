@@ -8,78 +8,54 @@ impl Display for EfficientPlayField {
 
         f.write_str("\n")?;
 
-        let (a, b, c) = (
-            self.get_field_state_char(2, 7),
-            self.get_field_state_char(2, 0),
-            self.get_field_state_char(2, 1),
-        );
+        let (a, b, c) =
+            (self.get_field_state_char(2, 7), self.get_field_state_char(2, 0), self.get_field_state_char(2, 1));
         writeln!(f, "\t{}|  {}------------{}------------{}", row_counter, a, b, c)?;
 
         row_counter -= 1;
         f.write_str("\t |  |            |            |\n")?;
 
-        let (a, b, c) = (
-            self.get_field_state_char(1, 7),
-            self.get_field_state_char(1, 0),
-            self.get_field_state_char(1, 1),
-        );
+        let (a, b, c) =
+            (self.get_field_state_char(1, 7), self.get_field_state_char(1, 0), self.get_field_state_char(1, 1));
         writeln!(f, "\t{}|  |   {}--------{}--------{}   |", row_counter, a, b, c)?;
         row_counter -= 1;
 
         f.write_str("\t |  |   |        |        |   |\n")?;
 
-        let (a, b, c) = (
-            self.get_field_state_char(0, 7),
-            self.get_field_state_char(0, 0),
-            self.get_field_state_char(0, 1),
-        );
+        let (a, b, c) =
+            (self.get_field_state_char(0, 7), self.get_field_state_char(0, 0), self.get_field_state_char(0, 1));
         writeln!(f, "\t{}|  |   |   {}----{}----{}   |   |", row_counter, a, b, c)?;
         row_counter -= 1;
 
         f.write_str("\t |  |   |   |         |   |   |\n")?;
 
-        let (a, b, c) = (
-            self.get_field_state_char(2, 6),
-            self.get_field_state_char(1, 6),
-            self.get_field_state_char(0, 6),
-        );
+        let (a, b, c) =
+            (self.get_field_state_char(2, 6), self.get_field_state_char(1, 6), self.get_field_state_char(0, 6));
         write!(f, "\t{}|  {}---{}---{}", row_counter, a, b, c)?;
 
-        let (a, b, c) = (
-            self.get_field_state_char(0, 2),
-            self.get_field_state_char(1, 2),
-            self.get_field_state_char(2, 2),
-        );
+        let (a, b, c) =
+            (self.get_field_state_char(0, 2), self.get_field_state_char(1, 2), self.get_field_state_char(2, 2));
         writeln!(f, "         {}---{}---{}", a, b, c)?;
         row_counter -= 1;
 
         f.write_str("\t |  |   |   |         |   |   |\n")?;
 
-        let (a, b, c) = (
-            self.get_field_state_char(0, 5),
-            self.get_field_state_char(0, 4),
-            self.get_field_state_char(0, 3),
-        );
+        let (a, b, c) =
+            (self.get_field_state_char(0, 5), self.get_field_state_char(0, 4), self.get_field_state_char(0, 3));
         writeln!(f, "\t{}|  |   |   {}----{}----{}   |   |", row_counter, a, b, c)?;
         row_counter -= 1;
 
         f.write_str("\t |  |   |        |        |   |\n")?;
 
-        let (a, b, c) = (
-            self.get_field_state_char(1, 5),
-            self.get_field_state_char(1, 4),
-            self.get_field_state_char(1, 3),
-        );
+        let (a, b, c) =
+            (self.get_field_state_char(1, 5), self.get_field_state_char(1, 4), self.get_field_state_char(1, 3));
         writeln!(f, "\t{}|  |   {}--------{}--------{}   |", row_counter, a, b, c)?;
         row_counter -= 1;
 
         f.write_str("\t |  |            |            |\n")?;
 
-        let (a, b, c) = (
-            self.get_field_state_char(2, 5),
-            self.get_field_state_char(2, 4),
-            self.get_field_state_char(2, 3),
-        );
+        let (a, b, c) =
+            (self.get_field_state_char(2, 5), self.get_field_state_char(2, 4), self.get_field_state_char(2, 3));
         writeln!(f, "\t{}|  {}------------{}------------{}", row_counter, a, b, c)?;
 
         f.write_str("\t   ____________________________\n")?;

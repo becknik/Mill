@@ -196,10 +196,7 @@ impl super::GameCoordinator {
                     EMP.paint(&self.player_names.1),
                     HIGHLIGHT.paint(stones_black)
                 );
-                println!(
-                    "> Stones left to set: {}",
-                    HIGHLIGHT.paint(9 - black_rounds_done.unwrap())
-                );
+                println!("> Stones left to set: {}", HIGHLIGHT.paint(9 - black_rounds_done.unwrap()));
             } else if let GamePhase::MoveAndJump = phase {
                 println!(
                     "> {}, it's your turn making a move with {}!",

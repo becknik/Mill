@@ -43,10 +43,7 @@ pub struct PlayField {
 
 impl Default for PlayField {
     fn default() -> Self {
-        Self {
-            state: [FieldState::Free; FIELD_COUNT],
-            amount_of_stones: (0, 0),
-        }
+        Self { state: [FieldState::Free; FIELD_COUNT], amount_of_stones: (0, 0) }
     }
 }
 
@@ -123,11 +120,8 @@ impl PlayField {
         // Moves in one direction
         } else if (start_pos.0 == target_pos.0) ^ (start_pos.1 == target_pos.1) {
             // if the letter stays the same, the letter is constant & specifies the layer the move should take place
-            let (layer_to_move_on_as_u8, constant_coord) = if start_pos.0 == target_pos.0 {
-                ((start_pos.0 as u8) - b'A', false)
-            } else {
-                (start_pos.1 - 1, true)
-            };
+            let (layer_to_move_on_as_u8, constant_coord) =
+                if start_pos.0 == target_pos.0 { ((start_pos.0 as u8) - b'A', false) } else { (start_pos.1 - 1, true) };
             //println!("layer: {}, constant coord: {}", layer_to_move_on_as_u8, constant_coord);
 
             let legal_move_range = match layer_to_move_on_as_u8 {

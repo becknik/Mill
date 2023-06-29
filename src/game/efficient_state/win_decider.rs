@@ -33,7 +33,7 @@ impl EfficientPlayField {
         stone_counter
     }
 
-    /// Returns the bit masks for the fields that can be taken by the player with player_color
+    /// Returns the FieldPos field coordinates of stones that can be taken by the player with player_color
     fn get_fields_to_take(&self, player_color: PlayerColor) -> SmallVec<[FieldPos; TO_TAKE_VEC_SIZE]> {
         let mut all_stones_to_take_pos = SmallVec::<[FieldPos; TO_TAKE_VEC_SIZE]>::new();
         let mut not_in_mill_pos = SmallVec::<[FieldPos; TO_TAKE_VEC_SIZE]>::new();
@@ -43,22 +43,14 @@ impl EfficientPlayField {
                 let current_field_state = self.get_field_state_at(ring_index, field_index, true);
 
                 if current_field_state == player_color.into() {
-                    all_stones_to_take_pos.push(FieldPos {
-                        ring_index,
-                        field_index,
-                    });
+                    all_stones_to_take_pos.push(FieldPos { ring_index, field_index });
 
                     if 0 == self.get_mill_count(
                         ring_index,
                         field_index,
-                        DirectionToCheck::OnAndAcrossRings {
-                            player_color: player_color.into(),
-                        },
+                        DirectionToCheck::OnAndAcrossRings { player_color: player_color.into() },
                     ) {
-                        not_in_mill_pos.push(FieldPos {
-                            ring_index,
-                            field_index,
-                        });
+                        not_in_mill_pos.push(FieldPos { ring_index, field_index });
                     }
                 }
             }
@@ -104,10 +96,7 @@ impl EfficientPlayField {
                     continue;
                 }
 
-                empty_fields_to_place.push(FieldPos {
-                    ring_index,
-                    field_index,
-                });
+                empty_fields_to_place.push(FieldPos { ring_index, field_index });
             }
         }
         empty_fields_to_place
@@ -435,9 +424,7 @@ impl EfficientPlayField {
                 if self.get_mill_count(
                     ring_index,
                     field_index,
-                    DirectionToCheck::OnAndAcrossRings {
-                        player_color: color.into(),
-                    },
+                    DirectionToCheck::OnAndAcrossRings { player_color: color.into() },
                 ) == 2
                 {
                     double_mill_count += 1;
@@ -497,9 +484,7 @@ impl EfficientPlayField {
                         let current_move_placements = self.get_move_placements(
                             ring_index,
                             field_index,
-                            MoveDirection::OnRing {
-                                target_field_index: neighbor_index,
-                            },
+                            MoveDirection::OnRing { target_field_index: neighbor_index },
                         );
                         output_placements.extend(current_move_placements);
                     }

@@ -33,10 +33,7 @@ impl EfficientPlayField {
             // Moving a stone onto the field on the other ring
             self.state[target_ring_index] |= color << (start.field_index * 2);
 
-            let target_pos = FieldPos {
-                ring_index: target_ring_index,
-                ..start
-            };
+            let target_pos = FieldPos { ring_index: target_ring_index, ..start };
             self.add_simulated_moves(target_pos, direction, color, simulated_playfields, fields_to_take);
 
             self.state[target_ring_index] = target_ring_backup;
@@ -46,10 +43,7 @@ impl EfficientPlayField {
             // Set the empty neighbors value to the old one of the current index:
             self.state[start.ring_index] |= color << (target_field_index * 2);
 
-            let target_pos = FieldPos {
-                field_index: target_field_index,
-                ..start
-            };
+            let target_pos = FieldPos { field_index: target_field_index, ..start };
             self.add_simulated_moves(target_pos, direction, color, simulated_playfields, fields_to_take);
         }
         // End simulation by applying backup state
@@ -71,11 +65,9 @@ impl EfficientPlayField {
         fields_to_take: &SmallVec<[FieldPos; TO_TAKE_VEC_SIZE]>,
     ) {
         let possible_mills_count = match direction {
-            MoveDirection::OnRing { target_field_index } => self.get_mill_count(
-                start.ring_index,
-                target_field_index,
-                OnAndAcrossRings { player_color: color },
-            ),
+            MoveDirection::OnRing { target_field_index } => {
+                self.get_mill_count(start.ring_index, target_field_index, OnAndAcrossRings { player_color: color })
+            }
             AcrossRings { target_ring_index } => self.get_mill_count(target_ring_index, start.field_index, OnRing),
         };
 

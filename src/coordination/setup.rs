@@ -74,11 +74,7 @@ impl GameCoordinator {
                 HIGHLIGHT.paint("white stones"),
                 HIGHLIGHT.paint(muehle::game::PlayerColor::White)
             );
-            print!(
-                "> Please enter a {} or the {}: ",
-                EMP.paint("players name"),
-                EMP.paint("player's number")
-            );
+            print!("> Please enter a {} or the {}: ", EMP.paint("players name"), EMP.paint("player's number"));
             io::stdout().flush().unwrap();
 
             let mut input_buffer = String::new();

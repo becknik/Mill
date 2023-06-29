@@ -55,9 +55,7 @@ impl PlayField {
         assert!(pos.0.is_uppercase());
         assert!(('A'..='G').contains(&pos.0));
 
-        let pos_index = FIELD_LUT
-            .iter()
-            .position(|lut_element| lut_element.0 == pos.0 && lut_element.1 == pos.1);
+        let pos_index = FIELD_LUT.iter().position(|lut_element| lut_element.0 == pos.0 && lut_element.1 == pos.1);
         /*  .enumerate() .find_map(|(i, &lut_pos)| if lut_pos == pos { Some(i) } else { None }); */
 
         match pos_index {

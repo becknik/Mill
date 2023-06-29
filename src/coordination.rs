@@ -177,10 +177,7 @@ impl GameCoordinator {
             true => &self.player_names.0,
             false => &self.player_names.1,
         };
-        println!(
-            "> {}",
-            EMP.paint(format!("{} won the match! Congratulations!", winners_name))
-        );
+        println!("> {}", EMP.paint(format!("{} won the match! Congratulations!", winners_name)));
 
         // TODO Ask for another round
     }

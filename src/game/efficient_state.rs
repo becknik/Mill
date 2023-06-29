@@ -82,16 +82,10 @@ impl EfficientPlayField {
         let old_ring_state = self.state[ring_index];
         // Assert target field is free, when field_state to is not
         if field_state != 0x0 {
-            assert!(
-                (old_ring_state & (3u16 << (index * 2))) == 0,
-                "Tried to place non-free on non-free"
-            );
+            assert!((old_ring_state & (3u16 << (index * 2))) == 0, "Tried to place non-free on non-free");
         // Assert target field is not free, when field_state is
         } else {
-            assert!(
-                (old_ring_state & (3u16 << (index * 2))) != 0,
-                "Tried to place free on free"
-            );
+            assert!((old_ring_state & (3u16 << (index * 2))) != 0, "Tried to place free on free");
         }
 
         // Shifting mask upon field index & applying it with disjunction
@@ -103,17 +97,10 @@ impl EfficientPlayField {
     ///
     /// The field_index must be < 8!
     fn get_field_state_at(&self, ring_index: usize, field_index: u16, align_to_lsb: bool) -> u16 {
-        assert!(
-            field_index < 8,
-            "`get_field_state_at` makes use of an abstract index representation"
-        );
+        assert!(field_index < 8, "`get_field_state_at` makes use of an abstract index representation");
 
         let field_state = self.state[ring_index] & (3u16 << (field_index * 2));
-        return if align_to_lsb {
-            field_state >> (field_index * 2)
-        } else {
-            field_state
-        };
+        return if align_to_lsb { field_state >> (field_index * 2) } else { field_state };
     }
 
     fn get_ring_index(ring_index: usize, relative: RelativePosition) -> usize {
@@ -250,9 +237,7 @@ impl EfficientPlayField {
                 if 0 < self.get_mill_count(
                     position.ring_index,
                     position.field_index,
-                    DirectionToCheck::OnAndAcrossRings {
-                        player_color: (!color).into(),
-                    },
+                    DirectionToCheck::OnAndAcrossRings { player_color: (!color).into() },
                 ) {
                     stones_to_take_counter -= 1;
                 }
@@ -318,9 +303,7 @@ impl EfficientPlayField {
                             *moves_into_mill_counter += self.simulate_move_get_mill_count(
                                 ring_index,
                                 field_index,
-                                MoveDirection::OnRing {
-                                    target_field_index: neighbor_index,
-                                },
+                                MoveDirection::OnRing { target_field_index: neighbor_index },
                                 current_field_state,
                             );
                         }
@@ -341,9 +324,7 @@ impl EfficientPlayField {
                     if self.get_mill_count(
                         ring_index,
                         field_index,
-                        DirectionToCheck::OnAndAcrossRings {
-                            player_color: current_field_state,
-                        },
+                        DirectionToCheck::OnAndAcrossRings { player_color: current_field_state },
                     ) == 0
                     {
                         *stones_to_take_counter += 1;
@@ -425,15 +406,9 @@ impl EfficientPlayField {
             for field_index in 0..8 {
                 let state = self.get_field_state_at(ring_index, field_index, true);
                 if state == color.into() {
-                    color_positions.push(FieldPos {
-                        ring_index,
-                        field_index,
-                    })
+                    color_positions.push(FieldPos { ring_index, field_index })
                 } else if state == (!color).into() {
-                    color_positions.push(FieldPos {
-                        ring_index,
-                        field_index,
-                    })
+                    color_positions.push(FieldPos { ring_index, field_index })
                 }
             }
         }

@@ -33,12 +33,7 @@ impl EfficientPlayField {
                         self.state[ring_index] &= !(0x0003 << (field_index * 2));
 
                         for empty_field in self.get_empty_fields() {
-                            if empty_field
-                                == (FieldPos {
-                                    ring_index,
-                                    field_index,
-                                })
-                            {
+                            if empty_field == (FieldPos { ring_index, field_index }) {
                                 continue;
                             }
 
@@ -50,9 +45,7 @@ impl EfficientPlayField {
                             let mills_possible = clone.get_mill_count(
                                 empty_field.ring_index,
                                 empty_field.field_index,
-                                DirectionToCheck::OnAndAcrossRings {
-                                    player_color: player_color.into(),
-                                },
+                                DirectionToCheck::OnAndAcrossRings { player_color: player_color.into() },
                             );
 
                             // If no mill occurred, just add the new config
@@ -79,13 +72,8 @@ impl EfficientPlayField {
                             if neighbor_state == 0 {
                                 self.simulate_possible_forward_moves_for(
                                     &fields_to_take,
-                                    FieldPos {
-                                        ring_index,
-                                        field_index,
-                                    },
-                                    MoveDirection::OnRing {
-                                        target_field_index: neighbor_index,
-                                    },
+                                    FieldPos { ring_index, field_index },
+                                    MoveDirection::OnRing { target_field_index: neighbor_index },
                                     player_color.into(),
                                     &mut simulated_playfield_buffer,
                                 );
@@ -103,10 +91,7 @@ impl EfficientPlayField {
                                 0 if next_rings_field_state == 0 => {
                                     self.simulate_possible_forward_moves_for(
                                         &fields_to_take,
-                                        FieldPos {
-                                            ring_index: 0,
-                                            field_index,
-                                        },
+                                        FieldPos { ring_index: 0, field_index },
                                         MoveDirection::AcrossRings { target_ring_index: 1 },
                                         player_color.into(),
                                         &mut simulated_playfield_buffer,
@@ -118,10 +103,7 @@ impl EfficientPlayField {
                                     if previous_rings_field_state == 0 {
                                         self.simulate_possible_forward_moves_for(
                                             &fields_to_take,
-                                            FieldPos {
-                                                ring_index: 1,
-                                                field_index,
-                                            },
+                                            FieldPos { ring_index: 1, field_index },
                                             MoveDirection::AcrossRings { target_ring_index: 0 },
                                             player_color.into(),
                                             &mut simulated_playfield_buffer,
@@ -133,10 +115,7 @@ impl EfficientPlayField {
                                     if next_rings_field_state == 0 {
                                         self.simulate_possible_forward_moves_for(
                                             &fields_to_take,
-                                            FieldPos {
-                                                ring_index: 1,
-                                                field_index,
-                                            },
+                                            FieldPos { ring_index: 1, field_index },
                                             MoveDirection::AcrossRings { target_ring_index: 2 },
                                             player_color.into(),
                                             &mut simulated_playfield_buffer,
@@ -148,10 +127,7 @@ impl EfficientPlayField {
                                 2 if previous_rings_field_state == 0 => {
                                     self.simulate_possible_forward_moves_for(
                                         &fields_to_take,
-                                        FieldPos {
-                                            ring_index: 2,
-                                            field_index,
-                                        },
+                                        FieldPos { ring_index: 2, field_index },
                                         MoveDirection::AcrossRings { target_ring_index: 1 },
                                         player_color.into(),
                                         &mut simulated_playfield_buffer,

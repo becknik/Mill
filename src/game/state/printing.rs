@@ -24,31 +24,21 @@ impl Display for FieldState {
 impl Display for PlayFieldError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PlayFieldError::FieldTranslationMappingError {
-                erroneous_field,
-                message,
-            } => f.write_fmt(format_args!(
-                "Error caused by: {}{} - {message}",
-                erroneous_field.0, erroneous_field.1
-            )),
-            PlayFieldError::FieldSetError {
-                player: player_color,
-                field,
-                field_state,
-                message,
-            } => f.write_fmt(format_args!(
-                "Error caused by setting {player_color} to field {}{} which is {} - {message}",
-                field.0, field.1, field_state
-            )),
-            PlayFieldError::InvalidMovementError {
-                start_field,
-                target_field,
-                player_color,
-                message,
-            } => f.write_fmt(format_args!(
-                "Error caused by moving {player_color} from field {}{} to {}{} - {message}",
-                start_field.0, start_field.1, target_field.0, target_field.1
-            )),
+            PlayFieldError::FieldTranslationMappingError { erroneous_field, message } => {
+                f.write_fmt(format_args!("Error caused by: {}{} - {message}", erroneous_field.0, erroneous_field.1))
+            }
+            PlayFieldError::FieldSetError { player: player_color, field, field_state, message } => {
+                f.write_fmt(format_args!(
+                    "Error caused by setting {player_color} to field {}{} which is {} - {message}",
+                    field.0, field.1, field_state
+                ))
+            }
+            PlayFieldError::InvalidMovementError { start_field, target_field, player_color, message } => {
+                f.write_fmt(format_args!(
+                    "Error caused by moving {player_color} from field {}{} to {}{} - {message}",
+                    start_field.0, start_field.1, target_field.0, target_field.1
+                ))
+            }
             PlayFieldError::InvalidProgramStateError { message } => f.write_str(message),
             PlayFieldError::FailedToTake { field, message } => {
                 f.write_fmt(format_args!("Error taking field {}{} - {message}", field.0, field.1))
@@ -107,10 +97,7 @@ impl PlayField {
         let d = self.unwrap_and_highligth(&mut iter, &indices_to_highlight);
         let e = self.unwrap_and_highligth(&mut iter, &indices_to_highlight);
         let f = self.unwrap_and_highligth(&mut iter, &indices_to_highlight);
-        println!(
-            "\t{}|  {}---{}---{}         {}---{}---{}",
-            row_counter, f, e, d, c, b, a
-        );
+        println!("\t{}|  {}---{}---{}         {}---{}---{}", row_counter, f, e, d, c, b, a);
         row_counter -= 1;
         println!("\t |  |   |   |         |   |   |");
 
@@ -148,11 +135,8 @@ impl PlayField {
         let next_element = iter.next().unwrap();
 
         // The fields getting printed from top to bottom, therefore the indices must start with the last elements of state array
-        let highlight_next_element = to_highlight.contains(
-            &next_element
-                .0
-                .abs_diff(super::representation::constants::FIELD_COUNT - 1),
-        );
+        let highlight_next_element =
+            to_highlight.contains(&next_element.0.abs_diff(super::representation::constants::FIELD_COUNT - 1));
 
         if highlight_next_element {
             EMP.paint(&next_element.1).to_string()
